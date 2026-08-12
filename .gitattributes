@@ -1,0 +1,19 @@
+# Normaliza para LF no repositório; o checkout decide o resto.
+* text=auto eol=lf
+
+# Scripts do Windows precisam de CRLF no disco. Com LF, o interpretador de lote
+# pode falhar em `goto` e rótulos — e o único ponto de entrada do kit deixaria
+# de funcionar exatamente na máquina para a qual foi feito.
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+
+# Binários: nunca normalizar.
+*.pdf         binary
+*.docx        binary
+*.png         binary
+*.jpg         binary
+*.tif         binary
+*.traineddata binary
+*.exe         binary
+*.sqlite3     binary

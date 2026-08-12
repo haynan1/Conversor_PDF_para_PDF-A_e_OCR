@@ -52,8 +52,8 @@ goto :instalar
 rem ------------------------------------------------- atualizacao do codigo ---
 :verificar_atualizacao
 if not exist "%MARCA%" goto :instalar
-rem Reinstala quando o projeto mudou depois da ultima instalacao.
-for %%A in ("%RAIZ%pyproject.toml") do set "ALVO=%%~tA"
+rem Reinstala quando o projeto mudou ou quando veio de outra copia.
+for %%A in ("%RAIZ%pyproject.toml") do set "ALVO=%%~tA %RAIZ%"
 set /p GRAVADO=<"%MARCA%"
 if "%GRAVADO%"=="%ALVO%" goto :abrir
 echo   Atualizando o Scriptor...
@@ -71,7 +71,7 @@ echo   Instalando a partir dos pacotes locais...
 if errorlevel 1 goto :falha_instalacao
 
 :marcar
-for %%A in ("%RAIZ%pyproject.toml") do echo %%~tA>"%MARCA%"
+for %%A in ("%RAIZ%pyproject.toml") do echo %%~tA %RAIZ%>"%MARCA%"
 
 rem ------------------------------------------------------------- interface ---
 :abrir
@@ -84,9 +84,26 @@ echo.
 goto :fim
 
 rem ---------------------------------------------------------------- falhas ---
+rem O projeto e distribuido de duas formas: como kit, com os instaladores
+rem dentro da pasta, e como clone do repositorio, onde eles nao existem porque
+rem binarios de centenas de megabytes nao sao versionados. Mandar o operador
+rem abrir uma pasta inexistente e pior que nao dizer nada.
 :sem_python
 echo   [ ! ]  O Python nao esta instalado nesta maquina.
 echo.
+if exist "%RAIZ%instaladores\python-*.exe" goto :python_do_kit
+
+echo   Instale com um dos dois caminhos:
+echo.
+echo       winget install --id Python.Python.3.13
+echo.
+echo   ou baixe em https://www.python.org/downloads/windows/
+echo   marcando "Add python.exe to PATH" na primeira tela.
+echo.
+echo   Depois de instalar, feche esta janela e abra o Scriptor de novo.
+goto :pausa
+
+:python_do_kit
 echo   Instale-o com o arquivo que acompanha o kit:
 echo.
 echo       instaladores\python-3.13.3-amd64.exe
@@ -96,7 +113,7 @@ echo   "Add python.exe to PATH" antes de clicar em "Install Now".
 echo.
 echo   Depois de instalar, feche esta janela e abra o Scriptor de novo.
 echo.
-if exist "%RAIZ%instaladores" start "" "%RAIZ%instaladores"
+start "" "%RAIZ%instaladores"
 goto :pausa
 
 :falha_ambiente
@@ -111,10 +128,15 @@ goto :pausa
 echo   [ ! ]  Nao foi possivel instalar os componentes do Scriptor.
 echo.
 echo   A instalacao precisa de internet na primeira execucao.
+if exist "%RAIZ%instaladores" (
 echo   Se esta maquina nao tem acesso a rede, peca ao responsavel
 echo   pelo kit os pacotes offline para a pasta:
 echo.
 echo       instaladores\wheels
+) else (
+echo   Sem rede, coloque os pacotes .whl numa pasta instaladores\wheels
+echo   ao lado deste arquivo e execute de novo.
+)
 echo.
 goto :pausa
 

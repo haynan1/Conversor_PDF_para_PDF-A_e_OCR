@@ -251,6 +251,28 @@ def _exe(stem: str) -> str:
     return f"{stem}.exe" if IS_WINDOWS else stem
 
 
+def bundled_installers() -> Path | None:
+    """Pasta ``instaladores`` que acompanha o kit, se esta cópia for um kit.
+
+    O projeto é distribuído de duas formas, e a orientação certa depende de qual
+    delas o operador tem em mãos: o **kit** traz os instaladores junto, o
+    **clone do repositório** não — binários de centenas de megabytes não são
+    versionados. Mandar alguém abrir uma pasta que não existe é pior que não
+    dizer nada.
+    """
+    for parent in Path(__file__).resolve().parents[:5]:
+        candidate = parent / "instaladores"
+        if candidate.is_dir() and any(candidate.glob("*.exe")):
+            return candidate
+    return None
+
+
+def _remedy(bundled: str, standalone: str) -> str:
+    """Escolhe a instrução conforme a origem desta cópia."""
+    kit = bundled_installers()
+    return bundled.format(pasta=kit) if kit else standalone
+
+
 def find_tesseract(override: Path | None = None) -> Tool:
     return _resolve_tool(
         "Tesseract",
@@ -262,10 +284,17 @@ def find_tesseract(override: Path | None = None) -> Tool:
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Tesseract-OCR",
         ),
         glob_patterns=("Tesseract-OCR/tesseract.exe", "Tesseract*/tesseract.exe"),
-        remedy=(
-            r"Instale o Tesseract com instaladores\tesseract-ocr-w64-setup-*.exe, ou aponte "
-            r'`tesseract = "C:/caminho/tesseract.exe"` no scriptor.toml. '
-            "Não é necessário mexer no PATH do Windows."
+        remedy=_remedy(
+            bundled=(
+                r"Instale o Tesseract: {pasta}\tesseract-ocr-w64-setup-*.exe. "
+                "Não é necessário mexer no PATH do Windows."
+            ),
+            standalone=(
+                "Instale o Tesseract com:  winget install --id UB-Mannheim.TesseractOCR  "
+                "(ou baixe em github.com/UB-Mannheim/tesseract/wiki). "
+                "Não é necessário mexer no PATH do Windows — "
+                'se preferir, aponte tesseract = "C:/caminho/tesseract.exe" no scriptor.toml.'
+            ),
         ),
     )  # type: ignore[return-value]
 
@@ -281,9 +310,16 @@ def find_ghostscript(override: Path | None = None) -> Tool:
             r"SOFTWARE\WOW6432Node\GPL Ghostscript",
         ),
         glob_patterns=("gs/gs*/bin/gswin64c.exe", "gs/gs*/bin/gswin32c.exe"),
-        remedy=(
-            r"Instale o Ghostscript com instaladores\gs*w64.exe. Ele é quem produz o "
-            "PDF/A — sem ele só é possível gerar PDF comum."
+        remedy=_remedy(
+            bundled=(
+                r"Instale o Ghostscript: {pasta}\gs*w64.exe. "
+                "Ele é quem produz o PDF/A — sem ele só é possível gerar PDF comum."
+            ),
+            standalone=(
+                "Instale o Ghostscript com:  winget install --id ArtifexSoftware.GhostScript  "
+                "(ou baixe em ghostscript.com/releases). "
+                "Ele é quem produz o PDF/A — sem ele só é possível gerar PDF comum."
+            ),
         ),
     )  # type: ignore[return-value]
 
@@ -401,10 +437,18 @@ def provision_languages(
         found = locate_traineddata(lang, extra_dirs)
         if found is None:
             raise LanguageError(
-                f"Idioma '{lang}' indisponível e nenhum {lang}.traineddata encontrado no kit",
-                remedy=(
-                    f"Baixe {lang}.traineddata de github.com/tesseract-ocr/tessdata "
-                    f"e coloque em {system_dir} ou na raiz do kit."
+                f"Idioma '{lang}' indisponível e nenhum {lang}.traineddata encontrado",
+                remedy=_remedy(
+                    bundled=(
+                        f"O kit traz o arquivo em {{pasta}}\\..\\idiomas. "
+                        f"Se ele não estiver lá, baixe {lang}.traineddata de "
+                        f"github.com/tesseract-ocr/tessdata e coloque em {system_dir}."
+                    ),
+                    standalone=(
+                        f"Baixe {lang}.traineddata de github.com/tesseract-ocr/tessdata "
+                        f"e coloque em {system_dir} — ou reinstale o Tesseract marcando "
+                        f"o idioma na tela 'Additional language data'."
+                    ),
                 ),
             )
         sources[lang] = found

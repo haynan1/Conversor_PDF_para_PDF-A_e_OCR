@@ -271,3 +271,60 @@ def test_idiomas_sao_lidos_do_disco(sistema) -> None:
     _, tessdata = sistema
     assert tc.installed_languages(tessdata) == {"eng"}
     assert tc.installed_languages(tessdata / "inexistente") == frozenset()
+
+
+# ------------------------------------------------- orientação por origem --
+
+
+def test_remedio_aponta_o_instalador_quando_e_um_kit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No kit, o instalador está a um clique — é para lá que se manda o operador."""
+    monkeypatch.setattr(tc, "bundled_installers", lambda: Path(r"C:\Kit\instaladores"))
+    with pytest.raises(ToolchainError) as erro:
+        tc.find_tesseract(Path("caminho-inexistente"))
+    assert "instaladores" in erro.value.remedy
+
+
+def test_remedio_usa_winget_quando_e_um_clone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Num clone do repositório não existe pasta de instaladores.
+
+    Apontar para ela seria mandar o operador procurar algo que não está lá.
+    """
+    monkeypatch.setattr(tc, "bundled_installers", lambda: None)
+    with pytest.raises(ToolchainError) as erro:
+        tc.find_tesseract(Path("caminho-inexistente"))
+    assert "winget" in erro.value.remedy
+    assert "instaladores" not in erro.value.remedy
+
+
+def test_remedio_do_ghostscript_tambem_se_adapta(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tc, "bundled_installers", lambda: None)
+    with pytest.raises(ToolchainError) as erro:
+        tc.find_ghostscript(Path("caminho-inexistente"))
+    assert "winget" in erro.value.remedy
+
+
+def test_remedio_de_idioma_se_adapta(sistema, monkeypatch: pytest.MonkeyPatch) -> None:
+    tesseract, _ = sistema
+    monkeypatch.delenv("TESSDATA_PREFIX", raising=False)
+    monkeypatch.setattr(tc, "bundled_installers", lambda: None)
+
+    with pytest.raises(LanguageError) as erro:
+        tc.provision_languages(tesseract, ["por"], extra_dirs=[])
+    assert "tessdata" in erro.value.remedy
+    assert "kit" not in erro.value.remedy.lower()
+
+
+def test_instaladores_do_kit_sao_detectados_por_presenca_de_exe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pasta vazia não conta: o que importa é haver instalador dentro dela."""
+    modulo = tmp_path / "src" / "scriptor" / "toolchain.py"
+    modulo.parent.mkdir(parents=True)
+    modulo.write_text("", encoding="utf-8")
+    monkeypatch.setattr(tc, "__file__", str(modulo))
+
+    (tmp_path / "instaladores").mkdir()
+    assert tc.bundled_installers() is None
+
+    (tmp_path / "instaladores" / "python-3.13.3-amd64.exe").write_bytes(b"")
+    assert tc.bundled_installers() == tmp_path / "instaladores"

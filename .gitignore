@@ -14,6 +14,7 @@ _scriptor/
 # Instaladores (centenas de MB) e modelos de idioma (15 MB cada) são
 # distribuídos junto do kit, não versionados.
 /instaladores/
+instaladores
 /idiomas/
 *.traineddata
 *.exe

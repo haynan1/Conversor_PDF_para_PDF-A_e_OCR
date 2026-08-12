@@ -26,7 +26,8 @@ originais vão para *Processados*.
 > executar. Não é necessário mexer no PATH do Windows.
 >
 > **Se o Python não estiver instalado**, o `Scriptor.cmd` avisa e abre a pasta
-> com o instalador. Marque *"Add python.exe to PATH"* na primeira tela.
+> com o instalador. Aceitar os padrões basta — o `py.exe` que o instalador
+> coloca em `C:\Windows` é suficiente para o Scriptor encontrá-lo.
 
 A interface tem duas visões: **Atividade**, com o lote em andamento em tempo
 real, e **Histórico**, que lê a trilha de auditoria completa — data, estratégia

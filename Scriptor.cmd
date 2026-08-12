@@ -109,8 +109,9 @@ echo   acabou de abrir:
 echo.
 for %%A in ("%RAIZ%instaladores\python-*.exe") do echo       instaladores\%%~nxA
 echo.
-echo   IMPORTANTE: na primeira tela do instalador, marque a caixa
-echo   "Add python.exe to PATH" antes de clicar em "Install Now".
+echo   Basta clicar em "Install Now" e aceitar os padroes. Marcar
+echo   "Add python.exe to PATH" ajuda, mas nao e obrigatorio: o
+echo   Scriptor tambem encontra o Python pelo launcher py.exe.
 echo.
 echo   Depois de instalar, feche esta janela e abra o Scriptor de novo.
 echo.

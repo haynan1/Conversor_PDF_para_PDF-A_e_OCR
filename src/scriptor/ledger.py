@@ -51,7 +51,10 @@ CREATE TABLE IF NOT EXISTS runs (
 
 CREATE TABLE IF NOT EXISTS documents (
     id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-    run_id             INTEGER NOT NULL REFERENCES runs(id),
+    -- Anulável: um documento convertido por um Runner avulso, fora de um lote,
+    -- continua sendo um registro de auditoria válido. A chave estrangeira
+    -- permanece exigida quando o lote existe.
+    run_id             INTEGER REFERENCES runs(id),
     created_at         TEXT NOT NULL,
     source_path        TEXT NOT NULL,
     source_sha256      TEXT NOT NULL,
@@ -201,7 +204,7 @@ class Ledger:
             f" VALUES ({placeholders})"
         )
         with self._lock:
-            cursor = self._conn.execute(statement, (*values, run_id, _now()))
+            cursor = self._conn.execute(statement, (*values, run_id or None, _now()))
             self._conn.commit()
             return int(cursor.lastrowid or 0)
 

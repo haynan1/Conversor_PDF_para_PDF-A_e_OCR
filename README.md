@@ -28,10 +28,19 @@ originais vão para *Processados*.
 > **Se o Python não estiver instalado**, o `Scriptor.cmd` avisa e abre a pasta
 > com o instalador. Marque *"Add python.exe to PATH"* na primeira tela.
 
+A interface tem duas visões: **Atividade**, com o lote em andamento em tempo
+real, e **Histórico**, que lê a trilha de auditoria completa — data, estratégia
+aplicada, páginas e resultado da verificação, com filtro por desfecho. Quando não
+há conversão em curso, ela abre direto no histórico.
+
+Tema **claro, escuro ou seguindo o sistema**, no canto superior direito. A
+escolha fica salva no navegador e é aplicada antes da primeira pintura, sem
+lampejo. Ambas as paletas foram medidas contra WCAG AA.
+
 O que a interface permite ajustar: idioma do reconhecimento, perfil de
 arquivamento (PDF/A-1b, 2b, 3b), destino dos originais, tratamento de documentos
-assinados e correções de imagem. Tudo é gravado no `scriptor.toml`, que continua
-legível e editável à mão.
+assinados e correções de imagem. Tudo é gravado no `scriptor.toml` — com os
+comentários preservados, para continuar editável à mão.
 
 ---
 
@@ -188,7 +197,7 @@ src/scriptor/           código
   ledger.py             idempotência e auditoria
   toolchain.py          descoberta de Tesseract e Ghostscript
   web/                  interface do operador
-tests/                  92 testes, incluindo conversões reais
+tests/                  206 testes, incluindo conversões reais
 instaladores/           Python, Tesseract e Ghostscript (não versionado)
 idiomas/                por.traineddata (não versionado)
 legado/                 o kit .bat original, preservado como referência
@@ -224,7 +233,8 @@ derrubar o restante.
 
 **A interface é servida localmente, não é uma janela nativa.** Tkinter não
 alcança a barra visual do projeto e PySide6 acrescentaria mais de cem megabytes
-ao kit. O servidor escuta apenas em `127.0.0.1`, exige um cabeçalho de
+ao kit. O navegador já está na máquina e entrega tipografia e layout de verdade,
+sem uma linha de dependência nova. O servidor escuta apenas em `127.0.0.1`, exige um cabeçalho de
 autenticação em toda chamada de API — o que impede acionamento por qualquer
 página de terceiros — valida o cabeçalho `Host` contra DNS rebinding e nunca
 aceita caminho de arquivo vindo do cliente.

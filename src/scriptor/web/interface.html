@@ -3,48 +3,99 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
 <title>Scriptor</title>
+<script>
+/* Aplica o tema salvo antes da primeira pintura. Sem isto, quem escolheu
+   "claro" veria um lampejo escuro em cada carregamento. */
+(function () {
+  try {
+    var escolha = localStorage.getItem("scriptor-tema");
+    if (escolha === "claro") document.documentElement.dataset.theme = "light";
+    else if (escolha === "escuro") document.documentElement.dataset.theme = "dark";
+  } catch (e) { /* localStorage bloqueado: segue o sistema */ }
+})();
+</script>
 <style>
 /* ─────────────────────────────────────────────────────────────────────────
-   Tokens. Dark-first: o tema escuro é o projeto, o claro é a adaptação.
+   Tokens.
+
+   Dark-first: o tema escuro é o projeto, definido em `:root`. O claro é uma
+   paleta desenhada — papel quente, tinta quase-preta, ouro rebaixado para
+   manter contraste sobre branco — e não uma inversão do escuro.
+
+   Três estados: escolha explícita (`data-theme`), ou o sistema quando não há
+   escolha. A regra do sistema é guardada por `:not([data-theme])` para que a
+   escolha do operador sempre vença.
    ───────────────────────────────────────────────────────────────────────── */
 :root {
+  color-scheme: dark;
   --bg:        #100f0d;
   --panel:     #171613;
   --raised:    #1e1c18;
   --line:      #2b2823;
   --line-soft: #221f1b;
   --text:      #ece7dd;
-  --muted:     #928b80;
-  --faint:     #6b6459;
+  --muted:     #9d968b;
+  --faint:     #867f72;
   --gold:      #c9a227;
   --gold-dim:  #8a6f1b;
+  --gold-wash: rgba(201,162,39,.10);
   --green:     #8bb15f;
   --amber:     #d79b4a;
   --red:       #d16a6a;
   --blue:      #85a8bd;
+  --btn-bg:    #c9a227;
+  --btn-fg:    #17140b;
   --shadow:    0 24px 60px -20px rgba(0,0,0,.75);
   --radius:    14px;
   --ease:      cubic-bezier(.2,.7,.2,1);
 }
+
 @media (prefers-color-scheme: light) {
-  :root {
-    --bg:        #f7f5f1;
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --bg:        #faf9f6;
     --panel:     #ffffff;
-    --raised:    #f2efe9;
-    --line:      #e2ddd3;
-    --line-soft: #ece8e0;
-    --text:      #1d1b17;
-    --muted:     #6f6961;
-    --faint:     #948d83;
-    --gold:      #9a7a10;
-    --gold-dim:  #c9a227;
-    --green:     #5b7f36;
-    --amber:     #a8701d;
-    --red:       #a94848;
-    --blue:      #476b80;
-    --shadow:    0 20px 50px -24px rgba(35,30,20,.28);
+    --raised:    #f3f1ec;
+    --line:      #e3ded4;
+    --line-soft: #edeae3;
+    --text:      #1c1a16;
+    --muted:     #625c53;
+    --faint:     #787164;
+    --gold:      #896f10;
+    --gold-dim:  #b9982a;
+    --gold-wash: rgba(137,111,16,.10);
+    --green:     #4f7230;
+    --amber:     #8f6415;
+    --red:       #a54444;
+    --blue:      #3f647a;
+    --btn-bg:    #c9a227;
+    --btn-fg:    #171308;
+    --shadow:    0 20px 50px -24px rgba(40,33,18,.24);
   }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg:        #faf9f6;
+  --panel:     #ffffff;
+  --raised:    #f3f1ec;
+  --line:      #e3ded4;
+  --line-soft: #edeae3;
+  --text:      #1c1a16;
+  --muted:     #625c53;
+  --faint:     #787164;
+  --gold:      #896f10;
+  --gold-dim:  #b9982a;
+  --gold-wash: rgba(137,111,16,.10);
+  --green:     #4f7230;
+  --amber:     #8f6415;
+  --red:       #a54444;
+  --blue:      #3f647a;
+  --btn-bg:    #c9a227;
+  --btn-fg:    #171308;
+  --shadow:    0 20px 50px -24px rgba(40,33,18,.24);
 }
 
 * { box-sizing: border-box; }
@@ -59,33 +110,37 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   font-variant-numeric: tabular-nums;
+  transition: background .3s var(--ease), color .3s var(--ease);
 }
 button, input, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
 
 /* ── Moldura ─────────────────────────────────────────────────────────────── */
 .shell { min-height: 100%; display: flex; flex-direction: column; }
 
 header {
-  display: flex; align-items: center; gap: 20px;
-  padding: 22px 32px 18px;
+  display: flex; align-items: center; gap: 14px;
+  padding: 20px 32px 16px;
   border-bottom: 1px solid var(--line-soft);
+  flex-wrap: wrap;
 }
 .wordmark { display: flex; align-items: baseline; gap: 12px; }
-.wordmark b {
-  font-size: 15px; font-weight: 650; letter-spacing: .22em; text-transform: uppercase;
-}
+.wordmark b { font-size: 15px; font-weight: 650; letter-spacing: .22em; text-transform: uppercase; }
 .wordmark span { font-size: 12px; color: var(--faint); letter-spacing: .06em; }
 .spacer { flex: 1; }
 
 .engine {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 9px;
   font-size: 12px; color: var(--muted);
   padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px;
   background: var(--panel);
 }
-.pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+.pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex: none; }
 .pulse.bad { background: var(--red); }
+
 .ghost {
   background: none; border: 1px solid var(--line); border-radius: 10px;
   padding: 7px 14px; font-size: 13px; color: var(--muted); cursor: pointer;
@@ -93,21 +148,37 @@ header {
 }
 .ghost:hover { border-color: var(--gold-dim); color: var(--text); }
 
+/* ── Seletor de tema ─────────────────────────────────────────────────────── */
+.theme {
+  display: flex; gap: 2px; padding: 3px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--panel);
+}
+.theme button {
+  display: grid; place-items: center; width: 28px; height: 26px;
+  background: none; border: none; border-radius: 999px;
+  color: var(--faint); cursor: pointer;
+  transition: background .18s var(--ease), color .18s var(--ease);
+}
+.theme button:hover { color: var(--text); }
+.theme button[aria-pressed="true"] { background: var(--gold-wash); color: var(--gold); }
+.theme svg { width: 15px; height: 15px; }
+
 /* ── Corpo ───────────────────────────────────────────────────────────────── */
 main {
   flex: 1; display: grid; grid-template-columns: minmax(340px, 420px) 1fr;
-  gap: 0; align-items: stretch;
+  align-items: stretch;
 }
 @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
 
-.left  { padding: 32px; border-right: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 20px; }
-.right { padding: 32px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.left  { padding: 28px 32px; border-right: 1px solid var(--line-soft);
+         display: flex; flex-direction: column; gap: 18px; }
+.right { padding: 28px 32px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 @media (max-width: 900px) { .left { border-right: none; border-bottom: 1px solid var(--line-soft); } }
 
 /* ── Zona de entrega ─────────────────────────────────────────────────────── */
 .drop {
   position: relative; border: 1px dashed var(--line); border-radius: var(--radius);
-  background: var(--panel); padding: 44px 28px; text-align: center; cursor: pointer;
+  background: var(--panel); padding: 42px 28px; text-align: center; cursor: pointer;
   transition: border-color .2s var(--ease), background .2s var(--ease),
               transform .2s var(--ease), box-shadow .3s var(--ease);
 }
@@ -118,37 +189,31 @@ main {
 }
 .drop h2 { margin: 0 0 6px; font-size: 16px; font-weight: 560; letter-spacing: -.01em; }
 .drop p  { margin: 0; font-size: 12.5px; color: var(--faint); }
-.drop svg { margin-bottom: 14px; color: var(--gold); opacity: .85; }
+.drop svg { margin-bottom: 14px; color: var(--gold); }
 .drop input { display: none; }
 
 /* ── Fila ────────────────────────────────────────────────────────────────── */
-.queue {
-  border: 1px solid var(--line); border-radius: var(--radius);
-  background: var(--panel); overflow: hidden;
-}
-.queue-head {
-  display: flex; align-items: center; gap: 10px;
-  padding: 14px 16px; border-bottom: 1px solid var(--line-soft);
-}
+.queue { border: 1px solid var(--line); border-radius: var(--radius);
+         background: var(--panel); overflow: hidden; }
+.queue-head { display: flex; align-items: center; gap: 10px;
+              padding: 13px 16px; border-bottom: 1px solid var(--line-soft); }
 .queue-head strong { font-size: 13px; font-weight: 560; }
 .queue-head em { font-style: normal; color: var(--faint); font-size: 12px; }
-.queue-list { max-height: 190px; overflow-y: auto; }
-.queue-list div {
-  padding: 8px 16px; font-size: 12.5px; color: var(--muted);
-  border-bottom: 1px solid var(--line-soft); white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis;
-}
+.queue-list { max-height: 178px; overflow-y: auto; }
+.queue-list div { padding: 8px 16px; font-size: 12.5px; color: var(--muted);
+                  border-bottom: 1px solid var(--line-soft); white-space: nowrap;
+                  overflow: hidden; text-overflow: ellipsis; }
 .queue-list div:last-child { border-bottom: none; }
 .queue-empty { padding: 18px 16px; font-size: 12.5px; color: var(--faint); }
 
 /* ── Ação ────────────────────────────────────────────────────────────────── */
 .primary {
   width: 100%; padding: 14px 20px; border: none; border-radius: 12px;
-  background: var(--gold); color: #17140b; font-size: 14px; font-weight: 620;
-  letter-spacing: .01em; cursor: pointer;
+  background: var(--btn-bg); color: var(--btn-fg);
+  font-size: 14px; font-weight: 620; cursor: pointer;
   transition: filter .18s var(--ease), transform .12s var(--ease);
 }
-.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.primary:hover:not(:disabled) { filter: brightness(1.07); }
 .primary:active:not(:disabled) { transform: translateY(1px); }
 .primary:disabled { opacity: .38; cursor: not-allowed; }
 .primary.stop { background: transparent; border: 1px solid var(--red); color: var(--red); }
@@ -166,21 +231,31 @@ main {
 .progress.on { display: block; }
 .track { height: 3px; background: var(--line-soft); border-radius: 2px; overflow: hidden; }
 .fill  { height: 100%; width: 0; background: var(--gold); transition: width .4s var(--ease); }
-.progress-meta {
-  display: flex; justify-content: space-between; margin-top: 8px;
-  font-size: 12px; color: var(--faint);
-}
+.progress-meta { display: flex; justify-content: space-between; margin-top: 8px;
+                 font-size: 12px; color: var(--faint); }
 
-/* ── Resultados ──────────────────────────────────────────────────────────── */
-.section-title {
+/* ── Abas ────────────────────────────────────────────────────────────────── */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line-soft); }
+.tabs button {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  padding: 8px 2px; margin-right: 20px; cursor: pointer;
   font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
-  color: var(--faint); font-weight: 600;
+  font-weight: 600; color: var(--faint);
+  transition: color .18s var(--ease), border-color .18s var(--ease);
 }
-.results { display: flex; flex-direction: column; gap: 1px; min-height: 0; }
+.tabs button:hover { color: var(--muted); }
+.tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--gold); }
+.tabs .count { font-size: 10.5px; color: var(--faint); letter-spacing: 0; margin-left: 6px; }
+
+.panel-body { display: none; flex-direction: column; gap: 12px; min-width: 0; }
+.panel-body.on { display: flex; flex: 1; }
+
+/* ── Linhas de resultado ─────────────────────────────────────────────────── */
+.rows { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rows:empty { display: none; }
 .row {
   display: grid; grid-template-columns: 18px minmax(0,1fr) auto;
-  gap: 12px; align-items: baseline;
-  padding: 11px 14px; border-radius: 10px;
+  gap: 12px; align-items: baseline; padding: 11px 14px; border-radius: 10px;
   animation: rise .28s var(--ease);
 }
 .row:nth-child(odd) { background: var(--panel); }
@@ -189,41 +264,47 @@ main {
 .row .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .meta { display: flex; gap: 14px; font-size: 12px; color: var(--faint); white-space: nowrap; }
 .row .note { grid-column: 2 / -1; font-size: 12px; color: var(--muted); white-space: normal; }
-.tag {
-  font-size: 11px; padding: 1px 7px; border-radius: 5px;
-  border: 1px solid var(--line); color: var(--muted);
-}
-.ok    { color: var(--green); }
-.warn  { color: var(--amber); }
-.bad   { color: var(--red); }
-.info  { color: var(--blue); }
-.dim   { color: var(--faint); }
-.spin  { display: inline-block; animation: spin 1s linear infinite; color: var(--gold); }
+.row .when { font-size: 11.5px; color: var(--faint); white-space: nowrap; }
+
+.tag { font-size: 11px; padding: 1px 7px; border-radius: 5px;
+       border: 1px solid var(--line); color: var(--muted); }
+.ok { color: var(--green); } .warn { color: var(--amber); }
+.bad { color: var(--red); }  .info { color: var(--blue); }
+.dim { color: var(--faint); }
+.spin { display: inline-block; animation: spin 1s linear infinite; color: var(--gold); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.empty {
-  border: 1px dashed var(--line-soft); border-radius: var(--radius);
-  padding: 40px 24px; text-align: center; color: var(--faint); font-size: 13px;
+.empty { flex: 1; display: grid; place-items: center; align-content: center;
+         border: 1px dashed var(--line-soft); border-radius: var(--radius);
+         padding: 40px 24px; text-align: center; color: var(--faint); font-size: 13px;
+         max-width: 46ch; margin: 0 auto; line-height: 1.65; }
+
+/* ── Filtros do histórico ────────────────────────────────────────────────── */
+.filters { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.chip {
+  padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px;
+  font-size: 12.5px; color: var(--muted); cursor: pointer; user-select: none;
+  background: none; transition: all .16s var(--ease);
+}
+.chip:hover { border-color: var(--gold-dim); }
+.chip[aria-pressed="true"], .chip.on {
+  border-color: var(--gold); color: var(--gold); background: var(--gold-wash);
 }
 
 /* ── Resumo ──────────────────────────────────────────────────────────────── */
-.summary {
-  display: none; border: 1px solid var(--line); border-radius: var(--radius);
-  background: var(--panel); padding: 18px 20px;
-}
+.summary { display: none; border: 1px solid var(--line); border-radius: var(--radius);
+           background: var(--panel); padding: 18px 20px; }
 .summary.on { display: block; }
-.summary-grid { display: flex; flex-wrap: wrap; gap: 22px; margin-bottom: 12px; }
+.summary-grid { display: flex; flex-wrap: wrap; gap: 22px; margin-bottom: 10px; }
 .stat b { display: block; font-size: 21px; font-weight: 620; letter-spacing: -.02em; }
 .stat span { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
 
-/* ── Painel de ajustes ───────────────────────────────────────────────────── */
-.scrim {
-  position: fixed; inset: 0; background: rgba(0,0,0,.5);
-  opacity: 0; pointer-events: none; transition: opacity .25s var(--ease); z-index: 20;
-}
+/* ── Gaveta de ajustes ───────────────────────────────────────────────────── */
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.45);
+         opacity: 0; pointer-events: none; transition: opacity .25s var(--ease); z-index: 20; }
 .scrim.on { opacity: 1; pointer-events: auto; }
 .drawer {
-  position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 100%);
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(430px, 100%);
   background: var(--panel); border-left: 1px solid var(--line);
   transform: translateX(100%); transition: transform .3s var(--ease);
   z-index: 21; overflow-y: auto; padding: 28px;
@@ -232,7 +313,7 @@ main {
 .drawer h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
 .drawer > p { margin: 0 0 24px; font-size: 12.5px; color: var(--faint); }
 .field { margin-bottom: 20px; }
-.field label { display: block; font-size: 12.5px; font-weight: 560; margin-bottom: 6px; }
+.field > label { display: block; font-size: 12.5px; font-weight: 560; margin-bottom: 6px; }
 .field .hint { font-size: 11.5px; color: var(--faint); margin-top: 5px; line-height: 1.45; }
 .field select, .field input[type=number] {
   width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px;
@@ -243,41 +324,26 @@ main {
 .check input { margin: 3px 0 0; accent-color: var(--gold); }
 .check small { display: block; color: var(--faint); font-size: 11.5px; }
 .langs { display: flex; flex-wrap: wrap; gap: 7px; }
-.chip {
-  padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px;
-  font-size: 12.5px; color: var(--muted); cursor: pointer; user-select: none;
-  transition: all .16s var(--ease);
-}
-.chip.on { border-color: var(--gold); color: var(--gold); background: color-mix(in srgb, var(--gold) 9%, transparent); }
 
-/* ── Diagnóstico ─────────────────────────────────────────────────────────── */
 .diag { border-top: 1px solid var(--line-soft); margin-top: 24px; padding-top: 20px; }
 .diag dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 0; font-size: 12.5px; }
 .diag dt { color: var(--faint); }
 .diag dd { margin: 0; word-break: break-all; }
-.hist { display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; }
-.hist div { display: flex; gap: 9px; align-items: baseline; }
-.hist span:first-child { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
-.hist span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap; }
-.hist em { font-style: normal; font-size: 11.5px; white-space: nowrap; }
+
+.section-title { font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+                 color: var(--faint); font-weight: 600; }
 
 /* ── Alerta ──────────────────────────────────────────────────────────────── */
-.alert {
-  display: none; gap: 12px; align-items: flex-start;
-  border: 1px solid var(--red); border-radius: var(--radius);
-  background: color-mix(in srgb, var(--red) 8%, transparent);
-  padding: 14px 16px; font-size: 13px;
-}
+.alert { display: none; gap: 12px; align-items: flex-start;
+         border: 1px solid var(--red); border-radius: var(--radius);
+         background: color-mix(in srgb, var(--red) 8%, transparent);
+         padding: 14px 16px; font-size: 13px; }
 .alert.on { display: flex; }
 .alert b { display: block; margin-bottom: 3px; }
 .alert p { margin: 0; color: var(--muted); font-size: 12.5px; }
 
-footer {
-  padding: 14px 32px; border-top: 1px solid var(--line-soft);
-  font-size: 11.5px; color: var(--faint);
-  display: flex; gap: 18px; flex-wrap: wrap;
-}
+footer { padding: 13px 32px; border-top: 1px solid var(--line-soft);
+         font-size: 11.5px; color: var(--faint); display: flex; gap: 18px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -286,16 +352,36 @@ footer {
   <header>
     <div class="wordmark"><b>Scriptor</b><span>OCR · PDF/A</span></div>
     <div class="spacer"></div>
+
     <div class="engine" id="engine" title="Motor de reconhecimento">
       <i class="pulse"></i><span id="engine-text">verificando…</span>
     </div>
+
+    <div class="theme" role="group" aria-label="Aparência">
+      <button data-tema="claro" aria-pressed="false" title="Tema claro" aria-label="Tema claro">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+      </button>
+      <button data-tema="sistema" aria-pressed="true" title="Seguir o sistema" aria-label="Seguir o sistema">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="2.5" y="4" width="19" height="13" rx="1.6"/><path d="M8.5 20.5h7"/></svg>
+      </button>
+      <button data-tema="escuro" aria-pressed="false" title="Tema escuro" aria-label="Tema escuro">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 14.5A8.2 8.2 0 0 1 9.5 4 8.3 8.3 0 1 0 20 14.5z"/></svg>
+      </button>
+    </div>
+
     <button class="ghost" id="open-settings" aria-haspopup="dialog">Ajustes</button>
   </header>
 
   <main>
     <section class="left">
       <div class="alert" id="alert" role="alert">
-        <span class="bad">!</span>
+        <span class="bad" aria-hidden="true">!</span>
         <div><b id="alert-title"></b><p id="alert-body"></p></div>
       </div>
 
@@ -305,9 +391,9 @@ footer {
           <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/>
           <path d="M3.5 15v3.5A1.5 1.5 0 0 0 5 20h14a1.5 1.5 0 0 0 1.5-1.5V15"/>
         </svg>
-        <h2>Solte os documentos aqui</h2>
+        <h2 id="drop-title">Solte os documentos aqui</h2>
         <p id="drop-hint">ou clique para escolher os arquivos</p>
-        <input type="file" id="picker" multiple>
+        <input type="file" id="picker" multiple aria-label="Escolher arquivos">
       </label>
 
       <div class="queue">
@@ -345,11 +431,36 @@ footer {
         <div class="dim" style="font-size:12px" id="summary-note"></div>
       </div>
 
-      <div class="section-title">Atividade</div>
-      <div class="results" id="results"></div>
-      <div class="empty" id="results-empty">
-        Os documentos convertidos aparecem aqui, com a estratégia aplicada e o
-        resultado da verificação PDF/A.
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-atividade" aria-selected="true"
+                aria-controls="painel-atividade">Atividade</button>
+        <button role="tab" id="tab-historico" aria-selected="false"
+                aria-controls="painel-historico">Histórico<span class="count" id="hist-count"></span></button>
+      </div>
+
+      <div class="panel-body on" id="painel-atividade" role="tabpanel" aria-labelledby="tab-atividade">
+        <div class="rows" id="results"></div>
+        <div class="empty" id="results-empty">
+          Os documentos convertidos aparecem aqui, com a estratégia aplicada e o
+          resultado da verificação PDF/A.
+        </div>
+      </div>
+
+      <div class="panel-body" id="painel-historico" role="tabpanel" aria-labelledby="tab-historico">
+        <div class="filters" id="hist-filters">
+          <button class="chip" data-status="" aria-pressed="true">Tudo</button>
+          <button class="chip" data-status="ok" aria-pressed="false">Convertidos</button>
+          <button class="chip" data-status="failed" aria-pressed="false">Falhas</button>
+          <button class="chip" data-status="skipped" aria-pressed="false">Pulados</button>
+          <button class="chip" data-status="rejected" aria-pressed="false">Recusados</button>
+          <div class="spacer"></div>
+          <button class="ghost" id="hist-reload" style="padding:5px 12px;font-size:12.5px">Atualizar</button>
+        </div>
+        <div class="rows" id="historico"></div>
+        <div class="empty" id="hist-empty">
+          Toda conversão fica registrada aqui — data, estratégia aplicada e
+          resultado da verificação. O registro é permanente e nunca é sobrescrito.
+        </div>
       </div>
     </section>
   </main>
@@ -367,8 +478,8 @@ footer {
   <p>Valem para as próximas conversões. Ficam salvos no <code>scriptor.toml</code>.</p>
 
   <div class="field">
-    <label>Idioma do reconhecimento</label>
-    <div class="langs" id="langs"></div>
+    <label id="rot-idioma">Idioma do reconhecimento</label>
+    <div class="langs" id="langs" role="group" aria-labelledby="rot-idioma"></div>
     <div class="hint">Mais de um idioma só ajuda em documentos realmente bilíngues;
       em documento monolíngue, tende a piorar o reconhecimento.</div>
   </div>
@@ -430,12 +541,6 @@ footer {
   </div>
 
   <div class="diag">
-    <div class="section-title" style="margin-bottom:12px">Últimas conversões</div>
-    <div id="historico" class="hist"></div>
-    <button class="ghost" id="load-history" style="margin-top:12px">Carregar histórico</button>
-  </div>
-
-  <div class="diag">
     <div class="section-title" style="margin-bottom:12px">Motor</div>
     <dl id="diag"></dl>
     <button class="ghost" id="recheck" style="margin-top:14px">Verificar novamente</button>
@@ -446,7 +551,29 @@ footer {
 const TOKEN = "__TOKEN__";
 const $ = (id) => document.getElementById(id);
 
-/* ── Cliente ───────────────────────────────────────────────────────────── */
+/* ── Tema ───────────────────────────────────────────────────────────────── */
+const TEMAS = { claro: "light", escuro: "dark" };
+
+function aplicarTema(escolha) {
+  if (TEMAS[escolha]) document.documentElement.dataset.theme = TEMAS[escolha];
+  else delete document.documentElement.dataset.theme;
+  try { localStorage.setItem("scriptor-tema", escolha); } catch (e) { /* sem persistência */ }
+  document.querySelectorAll(".theme button").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.tema === escolha)));
+}
+
+(function iniciarTema() {
+  let escolha = "sistema";
+  try { escolha = localStorage.getItem("scriptor-tema") || "sistema"; } catch (e) { /* padrão */ }
+  aplicarTema(escolha);
+})();
+
+document.querySelector(".theme").addEventListener("click", (e) => {
+  const botao = e.target.closest("button[data-tema]");
+  if (botao) aplicarTema(botao.dataset.tema);
+});
+
+/* ── Cliente ────────────────────────────────────────────────────────────── */
 async function api(path, options = {}) {
   const headers = Object.assign({ "X-Scriptor-Token": TOKEN }, options.headers || {});
   const response = await fetch(path, Object.assign({}, options, { headers }));
@@ -464,8 +591,14 @@ const fmtBytes = (n) => {
 };
 const fmtTime = (s) => s < 60 ? s.toFixed(1) + "s"
   : Math.floor(s / 60) + "m" + String(Math.round(s % 60)).padStart(2, "0") + "s";
+const fmtWhen = (iso) => (iso || "").slice(0, 16).replace("T", " ");
 
-/* ── Estado ────────────────────────────────────────────────────────────── */
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (ch) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
+
+/* ── Estado ─────────────────────────────────────────────────────────────── */
 let state = null;
 let running = false;
 let batchStart = 0;
@@ -473,13 +606,10 @@ let ticker = null;
 
 async function refresh() {
   state = await api("/api/estado");
-  paintQueue();
-  paintEngine();
-  paintSettings();
+  paintQueue(); paintEngine(); paintSettings();
   $("foot-workspace").textContent = state.workspace;
   $("foot-version").textContent = "Scriptor " + state.versao;
-  $("drop-hint").textContent = "ou clique para escolher — aceita " +
-    state.formatos.join(", ");
+  $("drop-hint").textContent = "ou clique para escolher — aceita " + state.formatos.join(", ");
 }
 
 function paintQueue() {
@@ -488,8 +618,7 @@ function paintQueue() {
     : total + (total === 1 ? " documento" : " documentos");
   $("queue-size").textContent = total ? "· " + fmtBytes(bytes) : "";
   $("queue-empty").style.display = total ? "none" : "block";
-  $("queue-list").innerHTML = nomes.map((n) =>
-    `<div>${escapeHtml(n)}</div>`).join("");
+  $("queue-list").innerHTML = nomes.map((n) => `<div>${escapeHtml(n)}</div>`).join("");
   $("convert").disabled = running || total === 0 || !state.motor.pronto;
 }
 
@@ -513,9 +642,7 @@ function paintEngine() {
     pulse.classList.add("bad");
     $("engine-text").textContent = "ambiente incompleto";
     const problem = engine.problema || {};
-    $("alert-title").textContent = problem.mensagem || "Dependência ausente";
-    $("alert-body").textContent = problem.remedio || "";
-    $("alert").classList.add("on");
+    alertUser(problem.mensagem || "Dependência ausente", problem.remedio || "");
     $("diag").innerHTML = `<dt>Estado</dt><dd>${escapeHtml(problem.mensagem || "")}</dd>`;
   }
 }
@@ -528,9 +655,10 @@ function paintSettings() {
   const available = new Set(state.motor.pronto ? state.motor.idiomas : c.languages);
   $("langs").innerHTML = LANGS
     .filter(([code]) => available.has(code) || c.languages.includes(code))
-    .map(([code, label]) =>
-      `<span class="chip ${c.languages.includes(code) ? "on" : ""}" data-lang="${code}">${label}</span>`)
-    .join("");
+    .map(([code, label]) => {
+      const on = c.languages.includes(code);
+      return `<button class="chip" data-lang="${code}" aria-pressed="${on}">${label}</button>`;
+    }).join("");
   $("perfil").value = c.pdfa_part;
   $("originais").value = c.on_success;
   $("assinados").value = c.on_signed;
@@ -560,16 +688,15 @@ function alertUser(title, body) {
   $("alert").classList.add("on");
 }
 
-/* ── Envio de arquivos ─────────────────────────────────────────────────── */
+/* ── Envio de arquivos ──────────────────────────────────────────────────── */
 const b64 = (text) => btoa(String.fromCharCode(...new TextEncoder().encode(text)));
 
 async function upload(files) {
   const list = Array.from(files);
   if (!list.length) return;
-  const drop = $("drop");
   let sent = 0;
   for (const file of list) {
-    $("drop").querySelector("h2").textContent = `Enviando ${sent + 1} de ${list.length}…`;
+    $("drop-title").textContent = `Enviando ${sent + 1} de ${list.length}…`;
     try {
       await api("/api/arquivos", {
         method: "POST",
@@ -581,19 +708,30 @@ async function upload(files) {
       alertUser(`${file.name}: ${error.message}`, error.remedio || "");
     }
   }
-  drop.querySelector("h2").textContent = "Solte os documentos aqui";
+  $("drop-title").textContent = "Solte os documentos aqui";
   await refresh();
 }
 
-/* ── Fluxo de eventos ──────────────────────────────────────────────────── */
+/* ── Fluxo de eventos ───────────────────────────────────────────────────── */
+const MODE_LABEL = { skip: "sem reprocessar texto", redo: "OCR nas imagens", force: "OCR completo" };
+const STATUS = {
+  ok:       { mark: "✓", cls: "ok",   word: "convertido" },
+  cached:   { mark: "·", cls: "info", word: "já convertido" },
+  skipped:  { mark: "–", cls: "info", word: "pulado" },
+  rejected: { mark: "!", cls: "warn", word: "recusado" },
+  failed:   { mark: "✗", cls: "bad",  word: "falhou" },
+};
+const MAX_ROWS = 300;
+const live = new Map();
+
 async function listen() {
-  while (true) {
+  for (;;) {
     try {
       const response = await fetch("/api/eventos", { headers: { "X-Scriptor-Token": TOKEN } });
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      while (true) {
+      for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
@@ -608,17 +746,6 @@ async function listen() {
   }
 }
 
-const MODE_LABEL = { skip: "sem reprocessar texto", redo: "OCR nas imagens", force: "OCR completo" };
-const STATUS = {
-  ok:       { mark: "✓", cls: "ok",   word: "convertido" },
-  cached:   { mark: "·", cls: "info", word: "já convertido" },
-  skipped:  { mark: "–", cls: "info", word: "pulado" },
-  rejected: { mark: "!", cls: "warn", word: "recusado" },
-  failed:   { mark: "✗", cls: "bad",  word: "falhou" },
-};
-
-const live = new Map();
-
 function handle(event) {
   if (event.tipo === "inicio") {
     running = true; batchStart = Date.now();
@@ -629,6 +756,7 @@ function handle(event) {
     $("convert").textContent = "Cancelar";
     $("convert").classList.add("stop");
     $("convert").disabled = false;
+    selectTab("atividade");
     updateProgress(0, event.total);
     ticker = setInterval(() => {
       $("progress-time").textContent = fmtTime((Date.now() - batchStart) / 1000);
@@ -638,7 +766,7 @@ function handle(event) {
   if (event.tipo === "comeco") {
     const row = document.createElement("div");
     row.className = "row";
-    row.innerHTML = `<span class="mark spin">◜</span>
+    row.innerHTML = `<span class="mark spin" aria-hidden="true">◜</span>
       <span class="name">${escapeHtml(event.nome)}</span>
       <span class="meta"><span class="dim">processando</span></span>`;
     $("results").prepend(row);
@@ -649,37 +777,37 @@ function handle(event) {
     const info = STATUS[event.status] || STATUS.failed;
     const row = live.get(event.nome) || document.createElement("div");
     row.className = "row";
+    const modo = MODE_LABEL[(event.modo || "").split("+")[0]] || event.modo || "";
     const meta = event.status === "ok"
-      ? `<span class="tag">${escapeHtml(MODE_LABEL[(event.modo || "").split("+")[0]] || event.modo || "")}</span>
+      ? `<span class="tag">${escapeHtml(modo)}</span>
          <span>${event.paginas} pág</span>
          <span>${fmtTime(event.duracao)}</span>
          <span class="${event.conforme ? "ok" : "warn"}">${event.conforme ? "PDF/A ✓" : "não conforme"}</span>`
       : `<span class="${info.cls}">${info.word}</span>`;
-    row.innerHTML = `<span class="mark ${info.cls}">${info.mark}</span>
+    row.innerHTML = `<span class="mark ${info.cls}" aria-hidden="true">${info.mark}</span>
       <span class="name">${escapeHtml(event.nome)}</span>
       <span class="meta">${meta}</span>` +
       (event.status !== "ok" && event.detalhe
         ? `<span class="note">${escapeHtml(event.detalhe)}</span>` : "");
     if (!live.has(event.nome)) $("results").prepend(row);
     live.delete(event.nome);
-    trimResults();
+    trimRows($("results"));
     updateProgress(event.concluidos, state ? state.fila.total : event.concluidos);
   }
 
-  if (event.tipo === "lote") { finish(event); }
+  if (event.tipo === "lote") finish(event);
   if (event.tipo === "erro") { alertUser(event.mensagem, event.remedio); finish(null); }
-  if (event.tipo === "cancelado") { $("convert").disabled = true; }
+  if (event.tipo === "cancelado") $("convert").disabled = true;
 }
 
-const MAX_ROWS = 300;
-function trimResults() {
-  const rows = $("results").children;
-  while (rows.length > MAX_ROWS) $("results").removeChild(rows[rows.length - 1]);
+function trimRows(container) {
+  while (container.children.length > MAX_ROWS) {
+    container.removeChild(container.children[container.children.length - 1]);
+  }
 }
 
 function updateProgress(done, total) {
-  const pct = total ? (done / total) * 100 : 0;
-  $("fill").style.width = pct + "%";
+  $("fill").style.width = (total ? (done / total) * 100 : 0) + "%";
   $("progress-count").textContent = `${done} de ${total}`;
 }
 
@@ -702,14 +830,72 @@ async function finish(event) {
     $("summary").classList.add("on");
   }
   await refresh();
+  loadHistory();  // o lote que acabou já faz parte do histórico
 }
 
-function escapeHtml(text) {
-  return String(text).replace(/[&<>"']/g, (ch) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+/* ── Abas ───────────────────────────────────────────────────────────────── */
+function selectTab(nome) {
+  for (const chave of ["atividade", "historico"]) {
+    const ativo = chave === nome;
+    $("tab-" + chave).setAttribute("aria-selected", String(ativo));
+    $("painel-" + chave).classList.toggle("on", ativo);
+  }
+  if (nome === "historico") loadHistory();
 }
 
-/* ── Ligações ──────────────────────────────────────────────────────────── */
+["atividade", "historico"].forEach((chave) =>
+  $("tab-" + chave).addEventListener("click", () => selectTab(chave)));
+
+/* ── Histórico ──────────────────────────────────────────────────────────── */
+let filtroHistorico = "";
+let carregandoHistorico = false;
+
+async function loadHistory() {
+  if (carregandoHistorico) return;
+  carregandoHistorico = true;
+  try {
+    const query = filtroHistorico ? `?status=${encodeURIComponent(filtroHistorico)}` : "";
+    const { registros, totais } = await api("/api/historico" + query);
+
+    const soma = Object.values(totais || {}).reduce((a, b) => a + b, 0);
+    $("hist-count").textContent = soma ? soma : "";
+    $("hist-empty").style.display = registros.length ? "none" : "block";
+
+    $("historico").innerHTML = registros.map((r) => {
+      const info = STATUS[r.status] || STATUS.failed;
+      const modo = MODE_LABEL[(r.modo || "").split("+")[0]] || r.modo || "";
+      const meta = [
+        modo ? `<span class="tag">${escapeHtml(modo)}</span>` : "",
+        r.paginas ? `<span>${r.paginas} pág</span>` : "",
+        r.conformidade ? `<span class="ok">${escapeHtml(r.conformidade)}</span>`
+                       : `<span class="${info.cls}">${info.word}</span>`,
+        `<span class="when">${fmtWhen(r.quando)}</span>`,
+      ].filter(Boolean).join("");
+      const nota = r.status !== "ok" && r.detalhe
+        ? `<span class="note">${escapeHtml(r.detalhe)}</span>` : "";
+      return `<div class="row"><span class="mark ${info.cls}" aria-hidden="true">${info.mark}</span>
+        <span class="name" title="${escapeHtml(r.caminho || r.arquivo)}">${escapeHtml(r.arquivo)}</span>
+        <span class="meta">${meta}</span>${nota}</div>`;
+    }).join("");
+  } catch (error) {
+    $("hist-empty").style.display = "block";
+    $("hist-empty").textContent = "Não foi possível ler o histórico: " + error.message;
+  } finally {
+    carregandoHistorico = false;
+  }
+}
+
+$("hist-filters").addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  filtroHistorico = chip.dataset.status;
+  $("hist-filters").querySelectorAll(".chip").forEach((c) =>
+    c.setAttribute("aria-pressed", String(c === chip)));
+  loadHistory();
+});
+$("hist-reload").addEventListener("click", loadHistory);
+
+/* ── Ligações ───────────────────────────────────────────────────────────── */
 const drop = $("drop");
 ["dragenter", "dragover"].forEach((type) =>
   drop.addEventListener(type, (e) => { e.preventDefault(); drop.classList.add("armed"); }));
@@ -747,11 +933,13 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") toggleDraw
 
 $("langs").addEventListener("click", (e) => {
   const chip = e.target.closest(".chip"); if (!chip) return;
-  const chosen = Array.from($("langs").querySelectorAll(".chip.on")).map((c) => c.dataset.lang);
+  const escolhidos = Array.from($("langs").querySelectorAll('[aria-pressed="true"]'))
+    .map((c) => c.dataset.lang);
   const code = chip.dataset.lang;
-  const next = chosen.includes(code) ? chosen.filter((c) => c !== code) : [...chosen, code];
-  if (!next.length) return;
-  pushSettings({ languages: next });
+  const proximo = escolhidos.includes(code)
+    ? escolhidos.filter((c) => c !== code) : [...escolhidos, code];
+  if (!proximo.length) return;   // pelo menos um idioma
+  pushSettings({ languages: proximo });
 });
 
 $("perfil").addEventListener("change", (e) => pushSettings({ pdfa_part: e.target.value }));
@@ -761,19 +949,6 @@ $("assinados").addEventListener("change", (e) => pushSettings({ on_signed: e.tar
  ["rotate", "rotate_pages"], ["recursive", "recursive"]].forEach(([id, key]) =>
   $(id).addEventListener("change", (e) => pushSettings({ [key]: e.target.checked })));
 
-$("load-history").addEventListener("click", async () => {
-  const { registros } = await api("/api/historico");
-  $("historico").innerHTML = registros.length
-    ? registros.map((r) => {
-        const info = STATUS[r.status] || STATUS.failed;
-        return `<div><span>${r.quando.slice(0, 16).replace("T", " ")}</span>
-          <span>${escapeHtml(r.arquivo)}</span>
-          <em class="${info.cls}">${info.word}</em></div>`;
-      }).join("")
-    : '<div class="dim">nenhuma conversão registrada</div>';
-  $("load-history").textContent = "Atualizar";
-});
-
 $("recheck").addEventListener("click", async () => {
   state = await api("/api/reverificar", { method: "POST" });
   paintQueue(); paintEngine(); paintSettings();
@@ -781,6 +956,12 @@ $("recheck").addEventListener("click", async () => {
 
 history.replaceState(null, "", location.pathname);
 refresh().catch((error) => alertUser("Não foi possível falar com o Scriptor", error.message));
+loadHistory().then(() => {
+  // Sem atividade nesta sessão, o histórico é o que há de útil para mostrar.
+  if (!running && !$("results").children.length && $("historico").children.length) {
+    selectTab("historico");
+  }
+});
 listen();
 setInterval(() => { if (!running) refresh().catch(() => {}); }, 5000);
 </script>

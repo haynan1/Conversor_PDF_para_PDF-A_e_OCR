@@ -441,22 +441,32 @@ class Studio:
         _reveal(target)
         return True
 
-    def history(self, limit: int = 40) -> list[dict[str, Any]]:
+    def history(self, *, limit: int = 50, status: str | None = None) -> dict[str, Any]:
+        """Trilha de auditoria, para consumo da interface."""
         if not self.settings.ledger_path.exists():
-            return []
+            return {"registros": [], "totais": {}}
+
+        limit = max(1, min(limit, 500))
+        if status not in {None, "ok", "failed", "skipped", "rejected"}:
+            raise ScriptorError(f"status desconhecido: {status}", remedy="")
+
         with Ledger(self.settings.ledger_path) as ledger:
-            return [
+            registros = [
                 {
                     "quando": record.created_at,
                     "arquivo": Path(record.source_path).name,
+                    "caminho": record.source_path,
                     "status": record.status,
                     "modo": record.mode,
                     "paginas": record.pages,
+                    "bytes": record.output_bytes,
                     "conformidade": record.conformance,
                     "detalhe": record.detail,
+                    "duracao": (record.duration_ms or 0) / 1000,
                 }
-                for record in ledger.recent(limit)
+                for record in ledger.recent(limit, status=status)
             ]
+            return {"registros": registros, "totais": ledger.totals()}
 
 
 # --------------------------------------------------------------------------- #
@@ -593,7 +603,17 @@ class Handler(BaseHTTPRequestHandler):
         if route == "/api/estado":
             self._json(self.studio.snapshot())
         elif route == "/api/historico":
-            self._json({"registros": self.studio.history()})
+            query = parse_qs(parsed.query)
+            status = (query.get("status") or [None])[0]
+            try:
+                limit = int((query.get("limite") or ["50"])[0])
+            except ValueError:
+                self._fail(HTTPStatus.BAD_REQUEST, "limite inválido")
+                return
+            try:
+                self._json(self.studio.history(limit=limit, status=status or None))
+            except ScriptorError as exc:
+                self._fail(HTTPStatus.BAD_REQUEST, exc.message, exc.remedy)
         elif route == "/api/eventos":
             self._stream_events()
         else:

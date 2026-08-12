@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pikepdf
 
-from scriptor.conformance import verify
+from scriptor.conformance import ConformanceReport, verify
 
 
 def test_pdf_comum_nao_passa_como_pdfa(samples: dict[str, Path]) -> None:
@@ -83,3 +83,100 @@ def test_fontes_embutidas_nao_geram_problema(samples: dict[str, Path]) -> None:
         # e pelo nome — não como erro de leitura.
         problemas = conformance._fonts_not_embedded(pdf)
     assert not any("ilegível" in item for item in problemas)
+
+
+# ---------------------------------------------------------------- veraPDF --
+
+_VERAPDF_REPROVA = b"""{"report": {"jobs": [{"validationResult": {
+  "compliant": false,
+  "details": {"ruleSummaries": [
+    {"clause": "6.1.7", "description": "Fonte nao embutida", "failedChecks": 3},
+    {"clause": "6.2.2", "description": "Espaco de cor sem OutputIntent", "failedChecks": 1}
+  ]}
+}}]}}"""
+
+_VERAPDF_APROVA = b'{"report": {"jobs": [{"validationResult": {"compliant": true}}]}}'
+
+
+class _Processo:
+    def __init__(self, stdout: bytes, returncode: int = 0) -> None:
+        self.stdout = stdout
+        self.stderr = b""
+        self.returncode = returncode
+
+
+def _tool(tmp_path: Path):
+    from scriptor.toolchain import Tool
+
+    binario = tmp_path / "verapdf.bat"
+    binario.write_text("", encoding="utf-8")
+    return Tool("veraPDF", binario, "1.26", "teste")
+
+
+def test_verapdf_reprovando_traz_as_clausulas(tmp_path: Path, monkeypatch) -> None:
+    from scriptor import conformance
+
+    monkeypatch.setattr(
+        conformance.subprocess, "run", lambda *a, **k: _Processo(_VERAPDF_REPROVA, 1)
+    )
+    relatorio = conformance._verify_verapdf(
+        tmp_path / "x.pdf", expected="pdfa-2", tool=_tool(tmp_path), timeout=10
+    )
+
+    assert relatorio is not None
+    assert not relatorio.ok
+    assert relatorio.validator == "veraPDF"
+    assert any("6.1.7" in p for p in relatorio.problems)
+
+
+def test_verapdf_aprovando(tmp_path: Path, monkeypatch) -> None:
+    from scriptor import conformance
+
+    monkeypatch.setattr(conformance.subprocess, "run", lambda *a, **k: _Processo(_VERAPDF_APROVA))
+    relatorio = conformance._verify_verapdf(
+        tmp_path / "x.pdf", expected="pdfa-1", tool=_tool(tmp_path), timeout=10
+    )
+
+    assert relatorio is not None and relatorio.ok
+    assert relatorio.declared == "1"
+
+
+def test_verapdf_com_saida_ilegivel_cai_no_codigo_de_saida(tmp_path: Path, monkeypatch) -> None:
+    from scriptor import conformance
+
+    monkeypatch.setattr(conformance.subprocess, "run", lambda *a, **k: _Processo(b"nao e json", 1))
+    relatorio = conformance._verify_verapdf(
+        tmp_path / "x.pdf", expected="pdfa-2", tool=_tool(tmp_path), timeout=10
+    )
+    assert relatorio is not None and not relatorio.ok
+
+
+def test_verapdf_que_nao_executa_devolve_none(tmp_path: Path, monkeypatch) -> None:
+    """Validador quebrado não pode virar reprovação — nem aprovação."""
+    from scriptor import conformance
+
+    def explode(*_a, **_k):
+        raise OSError("não pôde iniciar")
+
+    monkeypatch.setattr(conformance.subprocess, "run", explode)
+    assert (
+        conformance._verify_verapdf(
+            tmp_path / "x.pdf", expected="pdfa-2", tool=_tool(tmp_path), timeout=10
+        )
+        is None
+    )
+
+
+def test_verapdf_indisponivel_cai_na_checagem_interna(
+    samples: dict[str, Path], tmp_path: Path, monkeypatch
+) -> None:
+    from scriptor import conformance
+
+    monkeypatch.setattr(conformance, "_verify_verapdf", lambda *a, **k: None)
+    monkeypatch.setattr(
+        conformance, "_verify_internal", lambda *a, **k: ConformanceReport(True, "interno")
+    )
+
+    relatorio = verify(samples["nativo"], expected="pdfa-2", verapdf=_tool(tmp_path))
+    assert relatorio.ok
+    assert "indisponível" in relatorio.validator

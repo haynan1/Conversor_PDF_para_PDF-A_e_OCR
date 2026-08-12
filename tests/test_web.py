@@ -315,3 +315,138 @@ def test_conversao_completa_pela_interface(servidor, settings: Settings, samples
 
     assert (settings.output_dir / "escaneado.pdf").is_file()
     assert (settings.archive_dir / "nativo.pdf").is_file()
+
+
+# ------------------------------------------------------------------ tema --
+
+
+def test_interface_define_os_tres_estados_de_tema(servidor) -> None:
+    """Escuro é o projeto; claro é escolha explícita; sistema é o padrão."""
+    host, port, token = servidor
+    _, body = _request(host, port, "GET", f"/?t={token}")
+    html = body.decode("utf-8")
+
+    assert 'data-theme="light"' in html
+    assert ":root:not([data-theme])" in html, "escolha do operador não venceria o sistema"
+    assert "prefers-color-scheme: light" in html
+    assert 'localStorage.getItem("scriptor-tema")' in html
+
+
+def test_tema_e_aplicado_antes_da_primeira_pintura(servidor) -> None:
+    """Sem isto, quem escolheu claro vê um lampejo escuro a cada carregamento."""
+    host, port, token = servidor
+    _, body = _request(host, port, "GET", f"/?t={token}")
+    html = body.decode("utf-8")
+
+    inicio_script = html.index("scriptor-tema")
+    inicio_body = html.index("<body")
+    assert inicio_script < inicio_body
+
+
+def test_paleta_clara_nao_diverge_entre_escolha_e_sistema(servidor) -> None:
+    """Duas definições da mesma paleta é a origem clássica de tema inconsistente."""
+    import re
+
+    host, port, token = servidor
+    _, body = _request(host, port, "GET", f"/?t={token}")
+    html = body.decode("utf-8")
+
+    def tokens(padrao: str) -> dict[str, str]:
+        bloco = re.search(padrao, html, re.S).group(1)
+        return dict(re.findall(r"(--[a-z-]+):\s*([^;]+);", bloco))
+
+    explicito = tokens(r':root\[data-theme="light"\] \{(.*?)\}')
+    do_sistema = tokens(r":root:not\(\[data-theme\]\) \{(.*?)\}")
+    assert explicito == do_sistema
+    assert explicito["--bg"].strip() != "#100f0d"
+
+
+# ------------------------------------------------------------- histórico --
+
+
+def _semear_ledger(settings: Settings, quantidade: int = 3) -> None:
+    from scriptor.ledger import Ledger
+
+    with Ledger(settings.ledger_path) as ledger:
+        execucao = ledger.start_run(
+            recipe_hash="r1", toolchain="t=1", workspace=settings.workspace, settings={}
+        )
+        for indice in range(quantidade):
+            ledger.record(
+                execucao,
+                source_path=f"doc-{indice}.pdf",
+                source_sha256=f"sha{indice}",
+                source_bytes=100,
+                output_bytes=120,
+                recipe_hash="r1",
+                status="ok" if indice % 2 == 0 else "failed",
+                mode="redo",
+                pages=3,
+                conformance="PDF/A-2",
+                detail="motivo",
+            )
+
+
+def test_historico_devolve_registros_e_totais(servidor, settings: Settings) -> None:
+    _semear_ledger(settings, 4)
+    host, port, token = servidor
+    status, body = _request(host, port, "GET", "/api/historico", token=token)
+    payload = json.loads(body)
+
+    assert status == 200
+    assert len(payload["registros"]) == 4
+    assert payload["totais"] == {"ok": 2, "failed": 2}
+    primeiro = payload["registros"][0]
+    assert {"quando", "arquivo", "status", "modo", "paginas", "conformidade"} <= set(primeiro)
+
+
+def test_historico_filtra_por_status(servidor, settings: Settings) -> None:
+    _semear_ledger(settings, 4)
+    host, port, token = servidor
+    _, body = _request(host, port, "GET", "/api/historico?status=failed", token=token)
+    registros = json.loads(body)["registros"]
+
+    assert registros
+    assert all(r["status"] == "failed" for r in registros)
+
+
+def test_historico_recusa_status_desconhecido(servidor, settings: Settings) -> None:
+    _semear_ledger(settings)
+    host, port, token = servidor
+    status, _ = _request(host, port, "GET", "/api/historico?status=tudo", token=token)
+    assert status == 400
+
+
+def test_historico_limita_o_resultado(servidor, settings: Settings) -> None:
+    _semear_ledger(settings, 10)
+    host, port, token = servidor
+    _, body = _request(host, port, "GET", "/api/historico?limite=3", token=token)
+    assert len(json.loads(body)["registros"]) == 3
+
+
+def test_historico_teto_protege_contra_limite_absurdo(servidor, settings: Settings) -> None:
+    """Consulta sem teto é como o ledger vira um problema de memória."""
+    _semear_ledger(settings, 5)
+    host, port, token = servidor
+    status, body = _request(host, port, "GET", "/api/historico?limite=999999", token=token)
+    assert status == 200
+    assert len(json.loads(body)["registros"]) == 5
+
+
+def test_historico_limite_invalido_e_recusado(servidor) -> None:
+    host, port, token = servidor
+    status, _ = _request(host, port, "GET", "/api/historico?limite=abc", token=token)
+    assert status == 400
+
+
+def test_historico_sem_ledger_devolve_vazio(servidor) -> None:
+    host, port, token = servidor
+    status, body = _request(host, port, "GET", "/api/historico", token=token)
+    assert status == 200
+    assert json.loads(body) == {"registros": [], "totais": {}}
+
+
+def test_historico_exige_credencial(servidor) -> None:
+    host, port, _ = servidor
+    status, _ = _request(host, port, "GET", "/api/historico")
+    assert status == 401

@@ -104,9 +104,10 @@ echo   Depois de instalar, feche esta janela e abra o Scriptor de novo.
 goto :pausa
 
 :python_do_kit
-echo   Instale-o com o arquivo que acompanha o kit:
+echo   Instale-o com o arquivo que acompanha o kit, na pasta que
+echo   acabou de abrir:
 echo.
-echo       instaladores\python-3.13.3-amd64.exe
+for %%A in ("%RAIZ%instaladores\python-*.exe") do echo       instaladores\%%~nxA
 echo.
 echo   IMPORTANTE: na primeira tela do instalador, marque a caixa
 echo   "Add python.exe to PATH" antes de clicar em "Install Now".

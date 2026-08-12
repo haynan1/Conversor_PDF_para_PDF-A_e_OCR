@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import contextlib
+import os
+import subprocess
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -667,6 +669,167 @@ def init_command(
 
     divider()
     console.print("  [s.dim]coloque os documentos em Entrada e rode:[/] [s.value]scriptor run[/]\n")
+
+
+# --------------------------------------------------------------------------- #
+# empacotar
+# --------------------------------------------------------------------------- #
+
+#: Tudo que o operador precisa — e nada além. Lista de inclusão, não de
+#: exclusão: um esquecimento numa lista de exclusão vaza documento, e o
+#: workspace contém justamente os PDFs já processados e a trilha de auditoria.
+KIT_ARQUIVOS = ("Scriptor.cmd", "pyproject.toml", "README.md", "LICENSE")
+KIT_PASTAS = ("src", "instaladores", "idiomas")
+KIT_IGNORAR = {"__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache"}
+
+
+def _kit_root(start: Path) -> Path:
+    """Raiz do projeto: a pasta que tem o pyproject.toml e o ponto de entrada."""
+    current = start.resolve()
+    for directory in (current, *current.parents):
+        if (directory / "pyproject.toml").is_file() and (directory / "Scriptor.cmd").is_file():
+            return directory
+    raise ScriptorError(
+        f"nenhuma pasta de projeto encontrada a partir de {start}",
+        remedy="Rode o comando de dentro da pasta que contém Scriptor.cmd.",
+    )
+
+
+@app.command("empacotar")
+def package_command(
+    destino: Annotated[Optional[Path], typer.Argument(help="Arquivo .zip a gerar.")] = None,
+    offline: Annotated[
+        bool,
+        typer.Option(
+            "--offline",
+            help="Embute as dependências Python, para máquina sem internet.",
+        ),
+    ] = False,
+    force: Annotated[bool, typer.Option("--forcar", help="Sobrescreve o destino.")] = False,
+) -> None:
+    """Gera o .zip para enviar a quem vai apenas usar o Scriptor.
+
+    Deliberadamente **não** inclui a pasta de documentos nem o ledger: eles
+    contêm os arquivos já processados e a trilha de auditoria, e um kit é
+    encaminhado por e-mail sem que ninguém releia o conteúdo.
+    """
+    import zipfile
+
+    raiz = _kit_root(Path.cwd())
+    destino = (destino or Path.cwd() / f"Scriptor-{__version__}.zip").resolve()
+
+    if destino.exists() and not force:
+        _report_error(
+            ScriptorError(
+                f"{destino.name} já existe",
+                remedy="Use --forcar para sobrescrever, ou informe outro nome.",
+            )
+        )
+        raise typer.Exit(3)
+
+    console.print()
+    console.print("  [s.brand]SCRIPTOR[/]  [s.dim]empacotamento[/]")
+    divider()
+
+    if offline:
+        _build_wheels(raiz)
+
+    entradas: list[tuple[Path, str]] = []
+    for nome in KIT_ARQUIVOS:
+        caminho = raiz / nome
+        if caminho.is_file():
+            entradas.append((caminho, nome))
+    for pasta in KIT_PASTAS:
+        base = raiz / pasta
+        if not base.is_dir():
+            continue
+        for caminho in sorted(base.rglob("*")):
+            if not caminho.is_file():
+                continue
+            if any(parte in KIT_IGNORAR for parte in caminho.parts):
+                continue
+            if caminho.suffix in {".pyc", ".pyo"}:
+                continue
+            entradas.append((caminho, caminho.relative_to(raiz).as_posix()))
+
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    temporario = destino.with_suffix(".zip.parcial")
+    with zipfile.ZipFile(temporario, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as pacote:
+        for caminho, nome in entradas:
+            pacote.write(caminho, nome)
+    os.replace(temporario, destino)
+
+    _report_package(raiz, destino, entradas, offline=offline)
+
+
+def _build_wheels(raiz: Path) -> None:
+    """Baixa as dependências como .whl dentro do kit.
+
+    O ``Scriptor.cmd`` prefere esta pasta ao PyPI, o que torna a instalação
+    possível em máquina sem rede. As rodas compiladas (pikepdf) são específicas
+    da versão do Python — daí o kit acompanhar o instalador do 3.13.
+    """
+    rodas = raiz / "instaladores" / "wheels"
+    rodas.mkdir(parents=True, exist_ok=True)
+    console.print(f"  [s.dim]montando pacotes offline em {rodas.name}…[/]")
+    resultado = subprocess.run(  # noqa: S603
+        [sys.executable, "-m", "pip", "wheel", "--quiet", "--wheel-dir", str(rodas), str(raiz)],
+        capture_output=True,
+        check=False,
+    )
+    if resultado.returncode != 0:
+        detalhe = resultado.stderr.decode("utf-8", "replace").strip()[:400]
+        _report_error(
+            ScriptorError(
+                "não foi possível montar os pacotes offline",
+                remedy=f"pip falhou: {detalhe}",
+            )
+        )
+        raise typer.Exit(3)
+
+
+def _report_package(
+    raiz: Path, destino: Path, entradas: list[tuple[Path, str]], *, offline: bool
+) -> None:
+    from rich.table import Table
+
+    total = destino.stat().st_size
+    tabela = Table.grid(padding=(0, 2))
+    tabela.add_column(style="s.label", width=14)
+    tabela.add_column(style="s.value", overflow="fold")
+    tabela.add_row("arquivo", str(destino))
+    tabela.add_row("tamanho", fmt_bytes(total))
+    tabela.add_row("itens", str(len(entradas)))
+    console.print(tabela)
+
+    console.print()
+    console.print("  [s.label]incluído[/]")
+    for pasta in ("src", "instaladores", "idiomas"):
+        quantos = sum(1 for _, nome in entradas if nome.startswith(f"{pasta}/"))
+        if quantos:
+            console.print(f"    [s.ok]{glyph('ok')}[/] [s.dim]{pasta}/ — {quantos} arquivos[/]")
+    console.print(f"    [s.ok]{glyph('ok')}[/] [s.dim]Scriptor.cmd e documentação[/]")
+
+    console.print()
+    console.print("  [s.label]excluído[/]")
+    console.print("    [s.dim]Documentos/ — os PDFs já processados[/]")
+    console.print("    [s.dim]_scriptor/ — ledger e relatórios (trilha de auditoria)[/]")
+    console.print("    [s.dim].git/, tests/ — não servem a quem só vai usar[/]")
+
+    faltando = [p for p in ("instaladores", "idiomas") if not (raiz / p).is_dir()]
+    if faltando or not offline:
+        console.print()
+    if faltando:
+        console.print(
+            f"  [s.warn]{glyph('warn')}[/] [s.dim]sem {' e '.join(faltando)}: quem receber "
+            f"precisará instalar as dependências pela internet[/]"
+        )
+    elif not offline:
+        console.print(
+            "  [s.dim]a primeira execução baixa as bibliotecas Python da internet. "
+            "Use --offline para embuti-las.[/]"
+        )
+    console.print()
 
 
 # --------------------------------------------------------------------------- #

@@ -328,3 +328,22 @@ def test_instaladores_do_kit_sao_detectados_por_presenca_de_exe(
 
     (tmp_path / "instaladores" / "python-3.13.3-amd64.exe").write_bytes(b"")
     assert tc.bundled_installers() == tmp_path / "instaladores"
+
+
+def test_remedio_nomeia_o_instalador_que_existe_de_fato(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Instalador rebaixado duas vezes ganha sufixo do navegador.
+
+    Mandar procurar `tesseract-ocr-w64-setup-5.5.0.exe` quando o arquivo no
+    disco é `tesseract-ocr-w64-setup-5.5.0 (1).exe` trava exatamente quem o kit
+    tenta atender.
+    """
+    pasta = tmp_path / "instaladores"
+    pasta.mkdir()
+    (pasta / "tesseract-ocr-w64-setup-5.5.0 (1).exe").write_bytes(b"")
+    monkeypatch.setattr(tc, "bundled_installers", lambda: pasta)
+
+    with pytest.raises(ToolchainError) as erro:
+        tc.find_tesseract(Path("caminho-inexistente"))
+    assert "tesseract-ocr-w64-setup-5.5.0 (1).exe" in erro.value.remedy

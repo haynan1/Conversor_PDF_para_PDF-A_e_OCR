@@ -267,10 +267,19 @@ def bundled_installers() -> Path | None:
     return None
 
 
-def _remedy(bundled: str, standalone: str) -> str:
-    """Escolhe a instrução conforme a origem desta cópia."""
+def _remedy(bundled: str, standalone: str, *, pattern: str = "*") -> str:
+    """Escolhe a instrução conforme a origem desta cópia.
+
+    Quando há kit, a mensagem nomeia o **arquivo que existe de fato**, e não um
+    nome esperado: instaladores baixados duas vezes ganham sufixos do navegador,
+    e mandar procurar um nome que não está lá é pior que não orientar.
+    """
     kit = bundled_installers()
-    return bundled.format(pasta=kit) if kit else standalone
+    if kit is None:
+        return standalone
+    encontrados = sorted(kit.glob(pattern))
+    alvo = encontrados[0].name if encontrados else pattern
+    return bundled.format(pasta=kit, arquivo=alvo)
 
 
 def find_tesseract(override: Path | None = None) -> Tool:
@@ -285,8 +294,9 @@ def find_tesseract(override: Path | None = None) -> Tool:
         ),
         glob_patterns=("Tesseract-OCR/tesseract.exe", "Tesseract*/tesseract.exe"),
         remedy=_remedy(
+            pattern="tesseract*.exe",
             bundled=(
-                r"Instale o Tesseract: {pasta}\tesseract-ocr-w64-setup-*.exe. "
+                r"Instale o Tesseract: execute {arquivo} na pasta {pasta}. "
                 "Não é necessário mexer no PATH do Windows."
             ),
             standalone=(
@@ -311,8 +321,9 @@ def find_ghostscript(override: Path | None = None) -> Tool:
         ),
         glob_patterns=("gs/gs*/bin/gswin64c.exe", "gs/gs*/bin/gswin32c.exe"),
         remedy=_remedy(
+            pattern="gs*.exe",
             bundled=(
-                r"Instale o Ghostscript: {pasta}\gs*w64.exe. "
+                "Instale o Ghostscript: execute {arquivo} na pasta {pasta}. "
                 "Ele é quem produz o PDF/A — sem ele só é possível gerar PDF comum."
             ),
             standalone=(

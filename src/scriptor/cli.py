@@ -614,15 +614,17 @@ def clean_command(
         f"  [s.value]{len(victims)}[/] [s.dim]arquivos ·[/] [s.value]{fmt_bytes(total)}[/]"
     )
 
-    if not confirm:
-        console.print("  [s.dim]simulação. Adicione --confirmar para remover.[/]\n")
-        raise typer.Exit(0)
-
+    # O aviso precisa vir antes da decisão, não depois: alertar sobre o que já
+    # foi apagado não é aviso, é epitáfio.
     if "saida" in selected:
         console.print(
             "  [s.warn]atenção: a pasta de saída contém os PDF/A gerados, "
             "não cópias descartáveis.[/]"
         )
+
+    if not confirm:
+        console.print("  [s.dim]simulação. Adicione --confirmar para remover.[/]\n")
+        raise typer.Exit(0)
 
     removed = 0
     for path, _ in victims:

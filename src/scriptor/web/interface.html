@@ -255,6 +255,12 @@ main {
 .diag dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 0; font-size: 12.5px; }
 .diag dt { color: var(--faint); }
 .diag dd { margin: 0; word-break: break-all; }
+.hist { display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; }
+.hist div { display: flex; gap: 9px; align-items: baseline; }
+.hist span:first-child { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
+.hist span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.hist em { font-style: normal; font-size: 11.5px; white-space: nowrap; }
 
 /* ── Alerta ──────────────────────────────────────────────────────────────── */
 .alert {
@@ -421,6 +427,12 @@ footer {
           <small>A hierarquia da entrada é reproduzida na saída.</small>
         </span></label>
     </div>
+  </div>
+
+  <div class="diag">
+    <div class="section-title" style="margin-bottom:12px">Últimas conversões</div>
+    <div id="historico" class="hist"></div>
+    <button class="ghost" id="load-history" style="margin-top:12px">Carregar histórico</button>
   </div>
 
   <div class="diag">
@@ -638,7 +650,7 @@ function handle(event) {
     const row = live.get(event.nome) || document.createElement("div");
     row.className = "row";
     const meta = event.status === "ok"
-      ? `<span class="tag">${MODE_LABEL[(event.modo || "").split("+")[0]] || event.modo || ""}</span>
+      ? `<span class="tag">${escapeHtml(MODE_LABEL[(event.modo || "").split("+")[0]] || event.modo || "")}</span>
          <span>${event.paginas} pág</span>
          <span>${fmtTime(event.duracao)}</span>
          <span class="${event.conforme ? "ok" : "warn"}">${event.conforme ? "PDF/A ✓" : "não conforme"}</span>`
@@ -650,12 +662,19 @@ function handle(event) {
         ? `<span class="note">${escapeHtml(event.detalhe)}</span>` : "");
     if (!live.has(event.nome)) $("results").prepend(row);
     live.delete(event.nome);
+    trimResults();
     updateProgress(event.concluidos, state ? state.fila.total : event.concluidos);
   }
 
   if (event.tipo === "lote") { finish(event); }
   if (event.tipo === "erro") { alertUser(event.mensagem, event.remedio); finish(null); }
   if (event.tipo === "cancelado") { $("convert").disabled = true; }
+}
+
+const MAX_ROWS = 300;
+function trimResults() {
+  const rows = $("results").children;
+  while (rows.length > MAX_ROWS) $("results").removeChild(rows[rows.length - 1]);
 }
 
 function updateProgress(done, total) {
@@ -741,6 +760,19 @@ $("assinados").addEventListener("change", (e) => pushSettings({ on_signed: e.tar
 [["verify", "verify"], ["sidecar", "sidecar_text"], ["deskew", "deskew"],
  ["rotate", "rotate_pages"], ["recursive", "recursive"]].forEach(([id, key]) =>
   $(id).addEventListener("change", (e) => pushSettings({ [key]: e.target.checked })));
+
+$("load-history").addEventListener("click", async () => {
+  const { registros } = await api("/api/historico");
+  $("historico").innerHTML = registros.length
+    ? registros.map((r) => {
+        const info = STATUS[r.status] || STATUS.failed;
+        return `<div><span>${r.quando.slice(0, 16).replace("T", " ")}</span>
+          <span>${escapeHtml(r.arquivo)}</span>
+          <em class="${info.cls}">${info.word}</em></div>`;
+      }).join("")
+    : '<div class="dim">nenhuma conversão registrada</div>';
+  $("load-history").textContent = "Atualizar";
+});
 
 $("recheck").addEventListener("click", async () => {
   state = await api("/api/reverificar", { method: "POST" });

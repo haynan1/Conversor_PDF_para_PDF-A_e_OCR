@@ -18,7 +18,6 @@ inválido, sem afirmar que o restante é perfeito.
 
 from __future__ import annotations
 
-import contextlib
 import json
 import subprocess
 import sys
@@ -153,19 +152,28 @@ def _fonts_not_embedded(pdf: pikepdf.Pdf) -> set[str]:
     que em PDF comum podem ser referenciadas por nome.
     """
     missing: set[str] = set()
-    for page in pdf.pages:
-        fonts = None
-        with contextlib.suppress(Exception):
+    for index, page in enumerate(pdf.pages):
+        try:
             resources = page.obj.get("/Resources")
             fonts = resources.get("/Font") if resources is not None else None
+        except Exception as exc:
+            # Falha-fechada: recursos ilegíveis são motivo de reprovação, não
+            # de silêncio. Um validador que engole exceção passa a aprovar
+            # exatamente os arquivos mais estranhos — os que mais importam.
+            missing.add(f"página {index + 1}: recursos ilegíveis ({type(exc).__name__})")
+            continue
         if fonts is None:
             continue
+
         for font in fonts.values():
-            # Fonte ilegível não é prova de conformidade: se não dá para
-            # confirmar que está embutida, ela não conta como embutida.
-            with contextlib.suppress(Exception):
-                if not _font_is_embedded(font):
-                    missing.add(str(font.get("/BaseFont", "?")).lstrip("/"))
+            try:
+                embedded = _font_is_embedded(font)
+                name = str(font.get("/BaseFont", "?")).lstrip("/")
+            except Exception as exc:
+                missing.add(f"página {index + 1}: fonte ilegível ({type(exc).__name__})")
+                continue
+            if not embedded:
+                missing.add(name)
     return missing
 
 

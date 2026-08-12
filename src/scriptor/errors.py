@@ -34,24 +34,10 @@ class LanguageError(ToolchainError):
     """Idioma de OCR solicitado sem ``traineddata`` correspondente."""
 
 
-class DocumentError(ScriptorError):
-    """O documento de entrada não pode ser processado como está."""
-
-
-class EncryptedDocumentError(DocumentError):
-    remedy = "Forneça a senha do documento ou remova a proteção antes de reprocessar."
-
-
-class SignedDocumentError(DocumentError):
-    remedy = (
-        "OCR invalida assinaturas digitais. Use --on-signed invalidate "
-        "apenas se a perda da assinatura for aceitável."
-    )
-
-
-class ConversionError(ScriptorError):
-    """Todas as tentativas da escada de fallback falharam."""
-
-
-class ConformanceError(ScriptorError):
-    """A saída não atende ao perfil PDF/A exigido."""
+# Não há exceções para falhas de documento, de propósito.
+#
+# Documento protegido, corrompido, assinado ou que esgotou a escada de
+# tentativas é resultado esperado de um lote real, não condição excepcional. Um
+# lote de mil arquivos termina normalmente com alguns nesse estado, e o operador
+# precisa do relatório inteiro. Esses casos viram um `Outcome` com status e
+# motivo — nunca uma exceção que interromperia o restante do trabalho.

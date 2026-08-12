@@ -198,3 +198,23 @@ def test_simulacao_nao_escreve_nada(
     assert all(o.status == "skipped" for o in report.outcomes)
     assert list(settings.output_dir.iterdir()) == []
     assert (settings.input_dir / "escaneado.pdf").is_file()
+
+
+def test_documento_em_cache_sai_da_entrada(executado, toolchain: Toolchain) -> None:
+    """Regressão: o que já está convertido não pode ficar preso na entrada.
+
+    A versão anterior devolvia 'cached' sem aplicar a política de originais.
+    O arquivo era redescoberto e reidentificado como cache a cada execução, e a
+    fila nunca esvaziava — na interface, um documento que o operador não
+    conseguiria remover a não ser à mão.
+    """
+    settings, _ = executado
+    origem = settings.input_dir / "nativo.pdf"
+    shutil.copy2(settings.archive_dir / "nativo.pdf", origem)
+
+    with Ledger(settings.ledger_path) as ledger:
+        report = run(settings, toolchain, ledger=ledger)
+
+    resultado = _by_name(report)["nativo.pdf"]
+    assert resultado.status == "cached"
+    assert not origem.exists(), "documento em cache continuou na pasta de entrada"

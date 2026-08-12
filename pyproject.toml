@@ -12,11 +12,15 @@ license = { text = "MIT" }
 authors = [{ name = "James" }]
 keywords = ["ocr", "pdfa", "tesseract", "ocrmypdf", "arquivo", "digitalizacao"]
 
+# Tetos por versão maior são deliberados: este projeto é distribuído como kit e
+# instalado com `pip install` na máquina do operador, sem lock file e muitas
+# vezes meses depois do último teste. Uma major nova do OCRmyPDF chegando por
+# resolução automática quebraria a instalação de quem só deu um duplo clique.
 dependencies = [
-  "ocrmypdf>=16.0",
-  "pikepdf>=8.0",
-  "typer>=0.12",
-  "rich>=13.0",
+  "ocrmypdf>=16.0,<18.0",
+  "pikepdf>=8.0,<11.0",
+  "typer>=0.12,<1.0",
+  "rich>=13.0,<15.0",
 ]
 
 [project.optional-dependencies]

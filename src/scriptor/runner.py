@@ -206,6 +206,13 @@ class Runner:
 
         cached = self._cached(profile, destination)
         if cached is not None:
+            notes: list[str] = []
+            # O documento já foi convertido e a saída confere. Aplicar a mesma
+            # política de originais que se aplicaria a uma conversão nova —
+            # sem isto o arquivo ficaria preso na entrada para sempre, sendo
+            # redescoberto e reidentificado como cache a cada execução.
+            if not self.settings.dry_run:
+                self._relocate_success(job, notes)
             return Outcome(
                 job=job,
                 status="cached",
@@ -215,6 +222,7 @@ class Runner:
                 duration=time.perf_counter() - started,
                 output_path=destination,
                 output_bytes=destination.stat().st_size if destination.exists() else None,
+                notes=notes,
             )
 
         if self.settings.dry_run:
@@ -436,12 +444,14 @@ class Runner:
         if self.settings.force or self.ledger is None:
             return None
         record = self.ledger.lookup(profile.sha256, self.recipe_hash)
-        if record is None:
-            return None
-        if not destination.exists():
+        if record is None or not destination.exists():
             return None
         if record.output_sha256:
+            # Tamanho primeiro: descarta a divergência óbvia sem reler o
+            # arquivo inteiro. O hash só é calculado quando o tamanho bate.
             try:
+                if record.output_bytes and destination.stat().st_size != record.output_bytes:
+                    return None
                 if sha256_file(destination) != record.output_sha256:
                     return None
             except OSError:

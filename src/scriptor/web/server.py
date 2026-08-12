@@ -45,10 +45,14 @@ from .. import __version__
 from ..analysis import INPUT_SUFFIXES
 from ..config import Settings
 from ..config import save as save_settings
+from ..console import err_console
 from ..errors import ScriptorError
 from ..ledger import Ledger
 from ..toolchain import Toolchain
 from ..toolchain import resolve as resolve_toolchain
+
+#: Janela do cache da fila de entrada, em segundos.
+_QUEUE_TTL = 2.0
 
 #: Um lote de digitalização em alta resolução chega perto disto por arquivo.
 MAX_UPLOAD_BYTES = 512 * 1024 * 1024
@@ -132,6 +136,9 @@ class Studio:
         self.bus = EventBus()
         self.run = _RunState()
         self._lock = threading.Lock()
+        self._queue_lock = threading.Lock()
+        self._queue_cache: list | None = None
+        self._queue_at = 0.0
         self._runner = None
         self.toolchain: Toolchain | None = None
         self.toolchain_problem: dict[str, str] | None = None
@@ -155,11 +162,34 @@ class Studio:
 
     # -------------------------------------------------------------- estado --
 
+    def _queue(self):
+        """Fila de entrada, com cache curto.
+
+        A interface consulta o estado a cada poucos segundos, e cada aba aberta
+        multiplica isso. Uma varredura recursiva da pasta de entrada por
+        consulta seria I/O gratuito num acervo com milhares de arquivos.
+        """
+        from .. import pipeline
+
+        now = time.monotonic()
+        with self._queue_lock:
+            if self._queue_cache is not None and now - self._queue_at < _QUEUE_TTL:
+                return self._queue_cache
+        jobs = pipeline.discover(self.settings)
+        with self._queue_lock:
+            self._queue_cache = jobs
+            self._queue_at = now
+        return jobs
+
+    def invalidate_queue(self) -> None:
+        with self._queue_lock:
+            self._queue_cache = None
+
     def snapshot(self) -> dict[str, Any]:
         from .. import pipeline
 
         settings = self.settings
-        jobs = pipeline.discover(settings)
+        jobs = self._queue()
         workers, cores = pipeline.plan_concurrency(settings, len(jobs))
 
         return {
@@ -225,14 +255,14 @@ class Studio:
     # ------------------------------------------------------------ execução --
 
     def start(self) -> dict[str, Any]:
-        from .. import pipeline
 
         with self._lock:
             if self.run.running:
                 return {"iniciado": False, "motivo": "já existe um lote em andamento"}
             if self.toolchain is None:
                 return {"iniciado": False, "motivo": "ambiente incompleto"}
-            jobs = pipeline.discover(self.settings)
+            self.invalidate_queue()
+            jobs = self._queue()
             if not jobs:
                 return {"iniciado": False, "motivo": "nenhum documento na entrada"}
             self.run = _RunState(running=True, total=len(jobs), started=time.time())
@@ -276,6 +306,7 @@ class Studio:
         except Exception as exc:
             self.bus.publish({"tipo": "erro", "mensagem": f"{type(exc).__name__}: {exc}"})
         finally:
+            self.invalidate_queue()
             with self._lock:
                 self.run.running = False
                 self._runner = None
@@ -353,13 +384,34 @@ class Studio:
 
     # -------------------------------------------------------------- arquivos --
 
-    def store_upload(self, raw_name: str, payload: bytes) -> str:
+    def store_upload(self, raw_name: str, stream, length: int) -> str:
+        """Grava o envio direto no disco, em blocos.
+
+        Ler o arquivo inteiro para a memória antes de escrever tornaria o
+        consumo de RAM proporcional ao tamanho do lote — e uma digitalização em
+        alta resolução passa fácil de meio gigabyte. O arquivo aparece na pasta
+        de entrada só depois de completo, via rename: a varredura nunca encontra
+        um documento pela metade.
+        """
         name = sanitize_filename(raw_name)
         self.settings.input_dir.mkdir(parents=True, exist_ok=True)
         target = _unique(self.settings.input_dir / name)
         temporary = target.with_name(f".{target.name}.parcial")
-        temporary.write_bytes(payload)
-        os.replace(temporary, target)
+
+        remaining = length
+        try:
+            with temporary.open("wb") as handle:
+                while remaining > 0:
+                    chunk = stream.read(min(remaining, 1 << 20))
+                    if not chunk:
+                        raise ValueError("envio interrompido antes do fim")
+                    handle.write(chunk)
+                    remaining -= len(chunk)
+            os.replace(temporary, target)
+        except BaseException:
+            temporary.unlink(missing_ok=True)
+            raise
+        self.invalidate_queue()
         return target.name
 
     def clear_queue(self) -> int:
@@ -368,11 +420,10 @@ class Studio:
 
         removed = 0
         for job in pipeline.discover(self.settings):
-            try:
+            with contextlib.suppress(OSError):
                 job.source.unlink()
                 removed += 1
-            except OSError:
-                pass
+        self.invalidate_queue()
         return removed
 
     def open_folder(self, key: str) -> bool:
@@ -470,6 +521,11 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     server_version = f"Scriptor/{__version__}"
     sys_version = ""
+
+    #: Sem isto, um cliente que anuncia Content-Length e para de enviar prende
+    #: uma thread do servidor para sempre. O fluxo SSE não é afetado: escrevemos
+    #: um ping a cada 15 s, bem dentro da janela.
+    timeout = 120
 
     studio: Studio  # injetado pela fábrica
 
@@ -618,8 +674,7 @@ class Handler(BaseHTTPRequestHandler):
         if length > MAX_UPLOAD_BYTES:
             raise ValueError(f"arquivo acima do limite de {MAX_UPLOAD_BYTES // (1024 * 1024)} MB")
 
-        payload = _read_exactly(self.rfile, length)
-        stored = self.studio.store_upload(raw_name, payload)
+        stored = self.studio.store_upload(raw_name, self.rfile, length)
         self._json({"arquivo": stored})
 
     def _stream_events(self) -> None:
@@ -649,21 +704,17 @@ class Handler(BaseHTTPRequestHandler):
             self.studio.bus.unsubscribe(queue)
 
     def log_message(self, *args: Any) -> None:
+        """Silencia o log de acesso — uma linha por requisição não informa nada."""
         return
 
+    def log_error(self, format: str, *args: Any) -> None:
+        """Erros, ao contrário, precisam aparecer.
 
-def _read_exactly(stream, length: int) -> bytes:
-    chunks: list[bytes] = []
-    remaining = length
-    while remaining > 0:
-        chunk = stream.read(min(remaining, 1 << 20))
-        if not chunk:
-            break
-        chunks.append(chunk)
-        remaining -= len(chunk)
-    if remaining:
-        raise ValueError("envio interrompido")
-    return b"".join(chunks)
+        A stdlib encaminha ``log_error`` para ``log_message``; com o log de
+        acesso silenciado, uma falha de handler ficaria invisível — e servidor
+        que falha em silêncio é impossível de operar.
+        """
+        err_console.print(f"  [s.err]servidor:[/] [s.dim]{format % args}[/]")
 
 
 # --------------------------------------------------------------------------- #

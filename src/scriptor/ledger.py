@@ -18,8 +18,6 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
-from collections.abc import Iterator
-from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -96,6 +94,7 @@ class Record:
     source_sha256: str
     output_path: str | None
     output_sha256: str | None
+    output_bytes: int | None
     status: str
     nature: str | None
     pages: int | None
@@ -234,17 +233,6 @@ class Ledger:
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def iter_documents(self, status: str | None = None) -> Iterator[Record]:
-        query = "SELECT * FROM documents"
-        params: list[Any] = []
-        if status:
-            query += " WHERE status = ?"
-            params.append(status)
-        query += " ORDER BY id"
-        with self._lock, closing(self._conn.execute(query, params)) as cursor:
-            for row in cursor:
-                yield _to_record(row)
-
     # ------------------------------------------------------------ ciclo de vida --
 
     def close(self) -> None:
@@ -266,6 +254,7 @@ def _to_record(row: sqlite3.Row) -> Record:
         source_sha256=row["source_sha256"],
         output_path=row["output_path"],
         output_sha256=row["output_sha256"],
+        output_bytes=row["output_bytes"],
         status=row["status"],
         nature=row["nature"],
         pages=row["pages"],

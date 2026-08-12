@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    name: Testes (${{ matrix.os }} · Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      # O Scriptor depende de dois binários nativos. Sem eles, os testes
+      # end-to-end se auto-pulam — e a suíte deixaria de provar o que importa.
+      - name: Dependências nativas (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            tesseract-ocr tesseract-ocr-por ghostscript
+
+      - name: Dependências nativas (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install --no-progress -y tesseract ghostscript
+          echo "C:\Program Files\Tesseract-OCR" >> $env:GITHUB_PATH
+
+      - name: Instalar
+        run: pip install -e ".[dev]"
+
+      - name: Confirmar que a cadeia de ferramentas foi resolvida
+        run: python -m scriptor doctor
+
+      - name: Testes
+        run: pytest -q --cov=scriptor --cov-report=term-missing
+
+  qualidade:
+    name: Lint e formatação
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ruff
+      - run: ruff check src tests
+      - run: ruff format --check src tests

@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scriptor</title>
+<style>
+/* ─────────────────────────────────────────────────────────────────────────
+   Tokens. Dark-first: o tema escuro é o projeto, o claro é a adaptação.
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  --bg:        #100f0d;
+  --panel:     #171613;
+  --raised:    #1e1c18;
+  --line:      #2b2823;
+  --line-soft: #221f1b;
+  --text:      #ece7dd;
+  --muted:     #928b80;
+  --faint:     #6b6459;
+  --gold:      #c9a227;
+  --gold-dim:  #8a6f1b;
+  --green:     #8bb15f;
+  --amber:     #d79b4a;
+  --red:       #d16a6a;
+  --blue:      #85a8bd;
+  --shadow:    0 24px 60px -20px rgba(0,0,0,.75);
+  --radius:    14px;
+  --ease:      cubic-bezier(.2,.7,.2,1);
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:        #f7f5f1;
+    --panel:     #ffffff;
+    --raised:    #f2efe9;
+    --line:      #e2ddd3;
+    --line-soft: #ece8e0;
+    --text:      #1d1b17;
+    --muted:     #6f6961;
+    --faint:     #948d83;
+    --gold:      #9a7a10;
+    --gold-dim:  #c9a227;
+    --green:     #5b7f36;
+    --amber:     #a8701d;
+    --red:       #a94848;
+    --blue:      #476b80;
+    --shadow:    0 20px 50px -24px rgba(35,30,20,.28);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont,
+               "Inter", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 6px; }
+
+/* ── Moldura ─────────────────────────────────────────────────────────────── */
+.shell { min-height: 100%; display: flex; flex-direction: column; }
+
+header {
+  display: flex; align-items: center; gap: 20px;
+  padding: 22px 32px 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.wordmark { display: flex; align-items: baseline; gap: 12px; }
+.wordmark b {
+  font-size: 15px; font-weight: 650; letter-spacing: .22em; text-transform: uppercase;
+}
+.wordmark span { font-size: 12px; color: var(--faint); letter-spacing: .06em; }
+.spacer { flex: 1; }
+
+.engine {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12px; color: var(--muted);
+  padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel);
+}
+.pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+.pulse.bad { background: var(--red); }
+.ghost {
+  background: none; border: 1px solid var(--line); border-radius: 10px;
+  padding: 7px 14px; font-size: 13px; color: var(--muted); cursor: pointer;
+  transition: border-color .18s var(--ease), color .18s var(--ease);
+}
+.ghost:hover { border-color: var(--gold-dim); color: var(--text); }
+
+/* ── Corpo ───────────────────────────────────────────────────────────────── */
+main {
+  flex: 1; display: grid; grid-template-columns: minmax(340px, 420px) 1fr;
+  gap: 0; align-items: stretch;
+}
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+.left  { padding: 32px; border-right: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 20px; }
+.right { padding: 32px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (max-width: 900px) { .left { border-right: none; border-bottom: 1px solid var(--line-soft); } }
+
+/* ── Zona de entrega ─────────────────────────────────────────────────────── */
+.drop {
+  position: relative; border: 1px dashed var(--line); border-radius: var(--radius);
+  background: var(--panel); padding: 44px 28px; text-align: center; cursor: pointer;
+  transition: border-color .2s var(--ease), background .2s var(--ease),
+              transform .2s var(--ease), box-shadow .3s var(--ease);
+}
+.drop:hover { border-color: var(--gold-dim); }
+.drop.armed {
+  border-color: var(--gold); background: var(--raised);
+  transform: translateY(-2px); box-shadow: var(--shadow);
+}
+.drop h2 { margin: 0 0 6px; font-size: 16px; font-weight: 560; letter-spacing: -.01em; }
+.drop p  { margin: 0; font-size: 12.5px; color: var(--faint); }
+.drop svg { margin-bottom: 14px; color: var(--gold); opacity: .85; }
+.drop input { display: none; }
+
+/* ── Fila ────────────────────────────────────────────────────────────────── */
+.queue {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel); overflow: hidden;
+}
+.queue-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; border-bottom: 1px solid var(--line-soft);
+}
+.queue-head strong { font-size: 13px; font-weight: 560; }
+.queue-head em { font-style: normal; color: var(--faint); font-size: 12px; }
+.queue-list { max-height: 190px; overflow-y: auto; }
+.queue-list div {
+  padding: 8px 16px; font-size: 12.5px; color: var(--muted);
+  border-bottom: 1px solid var(--line-soft); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.queue-list div:last-child { border-bottom: none; }
+.queue-empty { padding: 18px 16px; font-size: 12.5px; color: var(--faint); }
+
+/* ── Ação ────────────────────────────────────────────────────────────────── */
+.primary {
+  width: 100%; padding: 14px 20px; border: none; border-radius: 12px;
+  background: var(--gold); color: #17140b; font-size: 14px; font-weight: 620;
+  letter-spacing: .01em; cursor: pointer;
+  transition: filter .18s var(--ease), transform .12s var(--ease);
+}
+.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.primary:active:not(:disabled) { transform: translateY(1px); }
+.primary:disabled { opacity: .38; cursor: not-allowed; }
+.primary.stop { background: transparent; border: 1px solid var(--red); color: var(--red); }
+
+.shortcuts { display: flex; flex-wrap: wrap; gap: 8px; }
+.shortcuts button {
+  flex: 1 1 auto; background: none; border: 1px solid var(--line); border-radius: 10px;
+  padding: 9px 12px; font-size: 12.5px; color: var(--muted); cursor: pointer;
+  transition: border-color .18s var(--ease), color .18s var(--ease);
+}
+.shortcuts button:hover { border-color: var(--gold-dim); color: var(--text); }
+
+/* ── Progresso ───────────────────────────────────────────────────────────── */
+.progress { display: none; }
+.progress.on { display: block; }
+.track { height: 3px; background: var(--line-soft); border-radius: 2px; overflow: hidden; }
+.fill  { height: 100%; width: 0; background: var(--gold); transition: width .4s var(--ease); }
+.progress-meta {
+  display: flex; justify-content: space-between; margin-top: 8px;
+  font-size: 12px; color: var(--faint);
+}
+
+/* ── Resultados ──────────────────────────────────────────────────────────── */
+.section-title {
+  font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--faint); font-weight: 600;
+}
+.results { display: flex; flex-direction: column; gap: 1px; min-height: 0; }
+.row {
+  display: grid; grid-template-columns: 18px minmax(0,1fr) auto;
+  gap: 12px; align-items: baseline;
+  padding: 11px 14px; border-radius: 10px;
+  animation: rise .28s var(--ease);
+}
+.row:nth-child(odd) { background: var(--panel); }
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.row .mark { font-size: 13px; line-height: 1.4; }
+.row .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .meta { display: flex; gap: 14px; font-size: 12px; color: var(--faint); white-space: nowrap; }
+.row .note { grid-column: 2 / -1; font-size: 12px; color: var(--muted); white-space: normal; }
+.tag {
+  font-size: 11px; padding: 1px 7px; border-radius: 5px;
+  border: 1px solid var(--line); color: var(--muted);
+}
+.ok    { color: var(--green); }
+.warn  { color: var(--amber); }
+.bad   { color: var(--red); }
+.info  { color: var(--blue); }
+.dim   { color: var(--faint); }
+.spin  { display: inline-block; animation: spin 1s linear infinite; color: var(--gold); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.empty {
+  border: 1px dashed var(--line-soft); border-radius: var(--radius);
+  padding: 40px 24px; text-align: center; color: var(--faint); font-size: 13px;
+}
+
+/* ── Resumo ──────────────────────────────────────────────────────────────── */
+.summary {
+  display: none; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel); padding: 18px 20px;
+}
+.summary.on { display: block; }
+.summary-grid { display: flex; flex-wrap: wrap; gap: 22px; margin-bottom: 12px; }
+.stat b { display: block; font-size: 21px; font-weight: 620; letter-spacing: -.02em; }
+.stat span { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+
+/* ── Painel de ajustes ───────────────────────────────────────────────────── */
+.scrim {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  opacity: 0; pointer-events: none; transition: opacity .25s var(--ease); z-index: 20;
+}
+.scrim.on { opacity: 1; pointer-events: auto; }
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 100%);
+  background: var(--panel); border-left: 1px solid var(--line);
+  transform: translateX(100%); transition: transform .3s var(--ease);
+  z-index: 21; overflow-y: auto; padding: 28px;
+}
+.drawer.on { transform: none; }
+.drawer h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+.drawer > p { margin: 0 0 24px; font-size: 12.5px; color: var(--faint); }
+.field { margin-bottom: 20px; }
+.field label { display: block; font-size: 12.5px; font-weight: 560; margin-bottom: 6px; }
+.field .hint { font-size: 11.5px; color: var(--faint); margin-top: 5px; line-height: 1.45; }
+.field select, .field input[type=number] {
+  width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--raised); color: var(--text);
+}
+.checks { display: flex; flex-direction: column; gap: 10px; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; cursor: pointer; }
+.check input { margin: 3px 0 0; accent-color: var(--gold); }
+.check small { display: block; color: var(--faint); font-size: 11.5px; }
+.langs { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip {
+  padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px;
+  font-size: 12.5px; color: var(--muted); cursor: pointer; user-select: none;
+  transition: all .16s var(--ease);
+}
+.chip.on { border-color: var(--gold); color: var(--gold); background: color-mix(in srgb, var(--gold) 9%, transparent); }
+
+/* ── Diagnóstico ─────────────────────────────────────────────────────────── */
+.diag { border-top: 1px solid var(--line-soft); margin-top: 24px; padding-top: 20px; }
+.diag dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 0; font-size: 12.5px; }
+.diag dt { color: var(--faint); }
+.diag dd { margin: 0; word-break: break-all; }
+
+/* ── Alerta ──────────────────────────────────────────────────────────────── */
+.alert {
+  display: none; gap: 12px; align-items: flex-start;
+  border: 1px solid var(--red); border-radius: var(--radius);
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  padding: 14px 16px; font-size: 13px;
+}
+.alert.on { display: flex; }
+.alert b { display: block; margin-bottom: 3px; }
+.alert p { margin: 0; color: var(--muted); font-size: 12.5px; }
+
+footer {
+  padding: 14px 32px; border-top: 1px solid var(--line-soft);
+  font-size: 11.5px; color: var(--faint);
+  display: flex; gap: 18px; flex-wrap: wrap;
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header>
+    <div class="wordmark"><b>Scriptor</b><span>OCR · PDF/A</span></div>
+    <div class="spacer"></div>
+    <div class="engine" id="engine" title="Motor de reconhecimento">
+      <i class="pulse"></i><span id="engine-text">verificando…</span>
+    </div>
+    <button class="ghost" id="open-settings" aria-haspopup="dialog">Ajustes</button>
+  </header>
+
+  <main>
+    <section class="left">
+      <div class="alert" id="alert" role="alert">
+        <span class="bad">!</span>
+        <div><b id="alert-title"></b><p id="alert-body"></p></div>
+      </div>
+
+      <label class="drop" id="drop">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/>
+          <path d="M3.5 15v3.5A1.5 1.5 0 0 0 5 20h14a1.5 1.5 0 0 0 1.5-1.5V15"/>
+        </svg>
+        <h2>Solte os documentos aqui</h2>
+        <p id="drop-hint">ou clique para escolher os arquivos</p>
+        <input type="file" id="picker" multiple>
+      </label>
+
+      <div class="queue">
+        <div class="queue-head">
+          <strong id="queue-count">fila vazia</strong>
+          <em id="queue-size"></em>
+          <div class="spacer"></div>
+          <button class="ghost" id="clear-queue" style="padding:4px 10px;font-size:12px">Limpar</button>
+        </div>
+        <div class="queue-list" id="queue-list"></div>
+        <div class="queue-empty" id="queue-empty">
+          Nada aguardando. Solte PDFs ou imagens digitalizadas acima.
+        </div>
+      </div>
+
+      <button class="primary" id="convert" disabled>Converter</button>
+
+      <div class="progress" id="progress">
+        <div class="track"><div class="fill" id="fill"></div></div>
+        <div class="progress-meta">
+          <span id="progress-count"></span><span id="progress-time"></span>
+        </div>
+      </div>
+
+      <div class="shortcuts">
+        <button data-open="saida">Abrir saída</button>
+        <button data-open="processados">Originais</button>
+        <button data-open="falhas">Falhas</button>
+      </div>
+    </section>
+
+    <section class="right">
+      <div class="summary" id="summary">
+        <div class="summary-grid" id="summary-grid"></div>
+        <div class="dim" style="font-size:12px" id="summary-note"></div>
+      </div>
+
+      <div class="section-title">Atividade</div>
+      <div class="results" id="results"></div>
+      <div class="empty" id="results-empty">
+        Os documentos convertidos aparecem aqui, com a estratégia aplicada e o
+        resultado da verificação PDF/A.
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span id="foot-workspace"></span>
+    <span class="spacer"></span>
+    <span id="foot-version"></span>
+  </footer>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Ajustes">
+  <h3>Ajustes</h3>
+  <p>Valem para as próximas conversões. Ficam salvos no <code>scriptor.toml</code>.</p>
+
+  <div class="field">
+    <label>Idioma do reconhecimento</label>
+    <div class="langs" id="langs"></div>
+    <div class="hint">Mais de um idioma só ajuda em documentos realmente bilíngues;
+      em documento monolíngue, tende a piorar o reconhecimento.</div>
+  </div>
+
+  <div class="field">
+    <label for="perfil">Perfil de arquivamento</label>
+    <select id="perfil">
+      <option value="pdfa-2">PDF/A-2b — padrão recomendado</option>
+      <option value="pdfa-1">PDF/A-1b — exigência de órgãos mais antigos</option>
+      <option value="pdfa-3">PDF/A-3b — permite anexos embutidos</option>
+      <option value="pdf">PDF comum — sem conformidade arquivística</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="originais">O que fazer com os originais</label>
+    <select id="originais">
+      <option value="archive">Mover para "Processados"</option>
+      <option value="keep">Deixar onde estão</option>
+      <option value="delete">Apagar após converter e verificar</option>
+    </select>
+    <div class="hint">Só depois de o PDF/A ter sido gerado <em>e</em> verificado.</div>
+  </div>
+
+  <div class="field">
+    <label for="assinados">Documentos com assinatura digital</label>
+    <select id="assinados">
+      <option value="skip">Pular e avisar</option>
+      <option value="invalidate">Converter, invalidando a assinatura</option>
+    </select>
+    <div class="hint">O OCR reescreve o arquivo e invalida a assinatura. Converter
+      um documento assinado é perda jurídica, não ganho de arquivamento.</div>
+  </div>
+
+  <div class="field">
+    <label>Opções</label>
+    <div class="checks">
+      <label class="check"><input type="checkbox" id="verify">
+        <span>Verificar a conformidade PDF/A
+          <small>Reprova e tenta outra estratégia se o arquivo não estiver conforme.</small>
+        </span></label>
+      <label class="check"><input type="checkbox" id="sidecar">
+        <span>Gerar arquivo de texto ao lado
+          <small>Um .txt por documento, útil para indexação e busca externa.</small>
+        </span></label>
+      <label class="check"><input type="checkbox" id="deskew">
+        <span>Corrigir inclinação da digitalização
+          <small>Melhora páginas tortas. Altera a imagem — desligado por padrão.</small>
+        </span></label>
+      <label class="check"><input type="checkbox" id="rotate">
+        <span>Corrigir orientação da página
+          <small>Gira páginas de cabeça para baixo, guiado pelo texto detectado.</small>
+        </span></label>
+      <label class="check"><input type="checkbox" id="recursive">
+        <span>Incluir subpastas
+          <small>A hierarquia da entrada é reproduzida na saída.</small>
+        </span></label>
+    </div>
+  </div>
+
+  <div class="diag">
+    <div class="section-title" style="margin-bottom:12px">Motor</div>
+    <dl id="diag"></dl>
+    <button class="ghost" id="recheck" style="margin-top:14px">Verificar novamente</button>
+  </div>
+</aside>
+
+<script>
+const TOKEN = "__TOKEN__";
+const $ = (id) => document.getElementById(id);
+
+/* ── Cliente ───────────────────────────────────────────────────────────── */
+async function api(path, options = {}) {
+  const headers = Object.assign({ "X-Scriptor-Token": TOKEN }, options.headers || {});
+  const response = await fetch(path, Object.assign({}, options, { headers }));
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!response.ok) throw Object.assign(new Error(data.erro || response.statusText), data);
+  return data;
+}
+
+const fmtBytes = (n) => {
+  if (!n) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let i = 0; while (n >= 1024 && i < 3) { n /= 1024; i++; }
+  return (i === 0 ? n.toFixed(0) : n.toFixed(1)) + " " + units[i];
+};
+const fmtTime = (s) => s < 60 ? s.toFixed(1) + "s"
+  : Math.floor(s / 60) + "m" + String(Math.round(s % 60)).padStart(2, "0") + "s";
+
+/* ── Estado ────────────────────────────────────────────────────────────── */
+let state = null;
+let running = false;
+let batchStart = 0;
+let ticker = null;
+
+async function refresh() {
+  state = await api("/api/estado");
+  paintQueue();
+  paintEngine();
+  paintSettings();
+  $("foot-workspace").textContent = state.workspace;
+  $("foot-version").textContent = "Scriptor " + state.versao;
+  $("drop-hint").textContent = "ou clique para escolher — aceita " +
+    state.formatos.join(", ");
+}
+
+function paintQueue() {
+  const { total, bytes, nomes } = state.fila;
+  $("queue-count").textContent = total === 0 ? "fila vazia"
+    : total + (total === 1 ? " documento" : " documentos");
+  $("queue-size").textContent = total ? "· " + fmtBytes(bytes) : "";
+  $("queue-empty").style.display = total ? "none" : "block";
+  $("queue-list").innerHTML = nomes.map((n) =>
+    `<div>${escapeHtml(n)}</div>`).join("");
+  $("convert").disabled = running || total === 0 || !state.motor.pronto;
+}
+
+function paintEngine() {
+  const engine = state.motor;
+  const pulse = document.querySelector(".pulse");
+  if (engine.pronto) {
+    pulse.classList.remove("bad");
+    $("engine-text").textContent =
+      `Tesseract ${engine.tesseract.versao} · Ghostscript ${engine.ghostscript.versao}`;
+    $("alert").classList.remove("on");
+    $("diag").innerHTML = [
+      ["Tesseract", `${engine.tesseract.versao} — ${engine.tesseract.caminho}`],
+      ["Localizado por", engine.tesseract.origem],
+      ["Ghostscript", `${engine.ghostscript.versao} — ${engine.ghostscript.caminho}`],
+      ["Idiomas", engine.idiomas.join(", ")],
+      ["tessdata", `${engine.tessdata.caminho} (${engine.tessdata.origem})`],
+      ["veraPDF", engine.verapdf || "não instalado — usando verificação interna"],
+    ].map(([k, v]) => `<dt>${k}</dt><dd>${escapeHtml(String(v))}</dd>`).join("");
+  } else {
+    pulse.classList.add("bad");
+    $("engine-text").textContent = "ambiente incompleto";
+    const problem = engine.problema || {};
+    $("alert-title").textContent = problem.mensagem || "Dependência ausente";
+    $("alert-body").textContent = problem.remedio || "";
+    $("alert").classList.add("on");
+    $("diag").innerHTML = `<dt>Estado</dt><dd>${escapeHtml(problem.mensagem || "")}</dd>`;
+  }
+}
+
+const LANGS = [["por", "Português"], ["eng", "Inglês"], ["spa", "Espanhol"],
+               ["fra", "Francês"], ["deu", "Alemão"], ["ita", "Italiano"]];
+
+function paintSettings() {
+  const c = state.config;
+  const available = new Set(state.motor.pronto ? state.motor.idiomas : c.languages);
+  $("langs").innerHTML = LANGS
+    .filter(([code]) => available.has(code) || c.languages.includes(code))
+    .map(([code, label]) =>
+      `<span class="chip ${c.languages.includes(code) ? "on" : ""}" data-lang="${code}">${label}</span>`)
+    .join("");
+  $("perfil").value = c.pdfa_part;
+  $("originais").value = c.on_success;
+  $("assinados").value = c.on_signed;
+  $("verify").checked = c.verify;
+  $("sidecar").checked = c.sidecar_text;
+  $("deskew").checked = c.deskew;
+  $("rotate").checked = c.rotate_pages;
+  $("recursive").checked = c.recursive;
+}
+
+async function pushSettings(patch) {
+  try {
+    state = await api("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    paintQueue(); paintEngine(); paintSettings();
+  } catch (error) {
+    alertUser(error.message, error.remedio || "");
+  }
+}
+
+function alertUser(title, body) {
+  $("alert-title").textContent = title;
+  $("alert-body").textContent = body || "";
+  $("alert").classList.add("on");
+}
+
+/* ── Envio de arquivos ─────────────────────────────────────────────────── */
+const b64 = (text) => btoa(String.fromCharCode(...new TextEncoder().encode(text)));
+
+async function upload(files) {
+  const list = Array.from(files);
+  if (!list.length) return;
+  const drop = $("drop");
+  let sent = 0;
+  for (const file of list) {
+    $("drop").querySelector("h2").textContent = `Enviando ${sent + 1} de ${list.length}…`;
+    try {
+      await api("/api/arquivos", {
+        method: "POST",
+        headers: { "X-Scriptor-Nome": b64(file.name) },
+        body: file,
+      });
+      sent++;
+    } catch (error) {
+      alertUser(`${file.name}: ${error.message}`, error.remedio || "");
+    }
+  }
+  drop.querySelector("h2").textContent = "Solte os documentos aqui";
+  await refresh();
+}
+
+/* ── Fluxo de eventos ──────────────────────────────────────────────────── */
+async function listen() {
+  while (true) {
+    try {
+      const response = await fetch("/api/eventos", { headers: { "X-Scriptor-Token": TOKEN } });
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let cut;
+        while ((cut = buffer.indexOf("\n\n")) >= 0) {
+          const chunk = buffer.slice(0, cut); buffer = buffer.slice(cut + 2);
+          if (chunk.startsWith("data: ")) handle(JSON.parse(chunk.slice(6)));
+        }
+      }
+    } catch { /* reconecta abaixo */ }
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+  }
+}
+
+const MODE_LABEL = { skip: "sem reprocessar texto", redo: "OCR nas imagens", force: "OCR completo" };
+const STATUS = {
+  ok:       { mark: "✓", cls: "ok",   word: "convertido" },
+  cached:   { mark: "·", cls: "info", word: "já convertido" },
+  skipped:  { mark: "–", cls: "info", word: "pulado" },
+  rejected: { mark: "!", cls: "warn", word: "recusado" },
+  failed:   { mark: "✗", cls: "bad",  word: "falhou" },
+};
+
+const live = new Map();
+
+function handle(event) {
+  if (event.tipo === "inicio") {
+    running = true; batchStart = Date.now();
+    $("results").innerHTML = ""; live.clear();
+    $("results-empty").style.display = "none";
+    $("summary").classList.remove("on");
+    $("progress").classList.add("on");
+    $("convert").textContent = "Cancelar";
+    $("convert").classList.add("stop");
+    $("convert").disabled = false;
+    updateProgress(0, event.total);
+    ticker = setInterval(() => {
+      $("progress-time").textContent = fmtTime((Date.now() - batchStart) / 1000);
+    }, 200);
+  }
+
+  if (event.tipo === "comeco") {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<span class="mark spin">◜</span>
+      <span class="name">${escapeHtml(event.nome)}</span>
+      <span class="meta"><span class="dim">processando</span></span>`;
+    $("results").prepend(row);
+    live.set(event.nome, row);
+  }
+
+  if (event.tipo === "fim") {
+    const info = STATUS[event.status] || STATUS.failed;
+    const row = live.get(event.nome) || document.createElement("div");
+    row.className = "row";
+    const meta = event.status === "ok"
+      ? `<span class="tag">${MODE_LABEL[(event.modo || "").split("+")[0]] || event.modo || ""}</span>
+         <span>${event.paginas} pág</span>
+         <span>${fmtTime(event.duracao)}</span>
+         <span class="${event.conforme ? "ok" : "warn"}">${event.conforme ? "PDF/A ✓" : "não conforme"}</span>`
+      : `<span class="${info.cls}">${info.word}</span>`;
+    row.innerHTML = `<span class="mark ${info.cls}">${info.mark}</span>
+      <span class="name">${escapeHtml(event.nome)}</span>
+      <span class="meta">${meta}</span>` +
+      (event.status !== "ok" && event.detalhe
+        ? `<span class="note">${escapeHtml(event.detalhe)}</span>` : "");
+    if (!live.has(event.nome)) $("results").prepend(row);
+    live.delete(event.nome);
+    updateProgress(event.concluidos, state ? state.fila.total : event.concluidos);
+  }
+
+  if (event.tipo === "lote") { finish(event); }
+  if (event.tipo === "erro") { alertUser(event.mensagem, event.remedio); finish(null); }
+  if (event.tipo === "cancelado") { $("convert").disabled = true; }
+}
+
+function updateProgress(done, total) {
+  const pct = total ? (done / total) * 100 : 0;
+  $("fill").style.width = pct + "%";
+  $("progress-count").textContent = `${done} de ${total}`;
+}
+
+async function finish(event) {
+  running = false;
+  clearInterval(ticker);
+  $("convert").textContent = "Converter";
+  $("convert").classList.remove("stop");
+  $("progress").classList.remove("on");
+
+  if (event) {
+    const totals = event.totais || {};
+    const labels = { ok: "convertidos", cached: "em cache", skipped: "pulados",
+                     rejected: "recusados", failed: "falharam" };
+    $("summary-grid").innerHTML = Object.entries(totals)
+      .map(([key, value]) => `<div class="stat"><b>${value}</b><span>${labels[key] || key}</span></div>`)
+      .join("") + `<div class="stat"><b>${fmtTime(event.duracao)}</b><span>duração</span></div>`;
+    $("summary-note").textContent = event.relatorio
+      ? "Relatório completo em " + event.relatorio : "";
+    $("summary").classList.add("on");
+  }
+  await refresh();
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (ch) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
+
+/* ── Ligações ──────────────────────────────────────────────────────────── */
+const drop = $("drop");
+["dragenter", "dragover"].forEach((type) =>
+  drop.addEventListener(type, (e) => { e.preventDefault(); drop.classList.add("armed"); }));
+["dragleave", "drop"].forEach((type) =>
+  drop.addEventListener(type, (e) => { e.preventDefault(); drop.classList.remove("armed"); }));
+drop.addEventListener("drop", (e) => upload(e.dataTransfer.files));
+$("picker").addEventListener("change", (e) => { upload(e.target.files); e.target.value = ""; });
+window.addEventListener("dragover", (e) => e.preventDefault());
+window.addEventListener("drop", (e) => e.preventDefault());
+
+$("convert").addEventListener("click", async () => {
+  if (running) { await api("/api/cancelar", { method: "POST" }); return; }
+  $("convert").disabled = true;
+  const result = await api("/api/converter", { method: "POST" });
+  if (!result.iniciado) { $("convert").disabled = false; alertUser(result.motivo, ""); }
+});
+
+$("clear-queue").addEventListener("click", async () => {
+  if (running) return;
+  await api("/api/limpar-fila", { method: "POST" });
+  await refresh();
+});
+
+document.querySelectorAll("[data-open]").forEach((button) =>
+  button.addEventListener("click", () => api("/api/abrir", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ alvo: button.dataset.open }),
+  })));
+
+const drawer = $("drawer"), scrim = $("scrim");
+const toggleDrawer = (on) => { drawer.classList.toggle("on", on); scrim.classList.toggle("on", on); };
+$("open-settings").addEventListener("click", () => toggleDrawer(true));
+scrim.addEventListener("click", () => toggleDrawer(false));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") toggleDrawer(false); });
+
+$("langs").addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip"); if (!chip) return;
+  const chosen = Array.from($("langs").querySelectorAll(".chip.on")).map((c) => c.dataset.lang);
+  const code = chip.dataset.lang;
+  const next = chosen.includes(code) ? chosen.filter((c) => c !== code) : [...chosen, code];
+  if (!next.length) return;
+  pushSettings({ languages: next });
+});
+
+$("perfil").addEventListener("change", (e) => pushSettings({ pdfa_part: e.target.value }));
+$("originais").addEventListener("change", (e) => pushSettings({ on_success: e.target.value }));
+$("assinados").addEventListener("change", (e) => pushSettings({ on_signed: e.target.value }));
+[["verify", "verify"], ["sidecar", "sidecar_text"], ["deskew", "deskew"],
+ ["rotate", "rotate_pages"], ["recursive", "recursive"]].forEach(([id, key]) =>
+  $(id).addEventListener("change", (e) => pushSettings({ [key]: e.target.checked })));
+
+$("recheck").addEventListener("click", async () => {
+  state = await api("/api/reverificar", { method: "POST" });
+  paintQueue(); paintEngine(); paintSettings();
+});
+
+history.replaceState(null, "", location.pathname);
+refresh().catch((error) => alertUser("Não foi possível falar com o Scriptor", error.message));
+listen();
+setInterval(() => { if (!running) refresh().catch(() => {}); }, 5000);
+</script>
+</body>
+</html>

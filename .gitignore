@@ -1,0 +1,44 @@
+# ─── Documentos do operador ─────────────────────────────────────────────────
+# O workspace é dados, não código. Nunca entra no repositório: um lote de
+# digitalização pode conter documento pessoal, contrato ou processo.
+/Documentos/
+/Entrada/
+/Saida/
+/Processados/
+/Falhas/
+_scriptor/
+*.pdf
+!legado/*.pdf
+
+# ─── Binários que acompanham o kit ──────────────────────────────────────────
+# Instaladores (centenas de MB) e modelos de idioma (15 MB cada) são
+# distribuídos junto do kit, não versionados.
+/instaladores/
+/idiomas/
+*.traineddata
+*.exe
+*.msi
+
+# ─── Python ─────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# ─── Sistema e editores ─────────────────────────────────────────────────────
+Thumbs.db
+desktop.ini
+.DS_Store
+.idea/
+.vscode/
+*.swp
